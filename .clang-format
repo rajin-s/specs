@@ -1,0 +1,80 @@
+AccessModifierOffset: 0
+AlignEscapedNewlinesLeft: true
+AlignTrailingComments: true
+AllowAllParametersOfDeclarationOnNextLine: false
+AllowShortFunctionsOnASingleLine: Empty
+AllowShortIfStatementsOnASingleLine: true
+AllowShortLoopsOnASingleLine: true
+AlwaysBreakBeforeMultilineStrings: false
+AlwaysBreakTemplateDeclarations: true
+BinPackParameters: false
+BreakBeforeBinaryOperators: false
+BreakBeforeBraces: Allman
+BreakBeforeTernaryOperators: false
+BreakConstructorInitializersBeforeComma: false
+ColumnLimit: 200
+CommentPragmas: ''
+ConstructorInitializerAllOnOneLineOrOnePerLine: false
+ConstructorInitializerIndentWidth: 2
+Cpp11BracedListStyle: false
+DerivePointerBinding: false
+IndentCaseLabels: false
+IndentFunctionDeclarationAfterType: false
+IndentWidth: 4
+Language: Cpp
+MaxEmptyLinesToKeep: 2
+NamespaceIndentation: All
+ObjCSpaceAfterProperty: true
+ObjCSpaceBeforeProtocolList: true
+PenaltyBreakBeforeFirstCallParameter: 100
+PenaltyBreakComment: 100
+PenaltyBreakFirstLessLess: 0
+PenaltyBreakString: 100
+PenaltyExcessCharacter: 1
+PenaltyReturnTypeOnItsOwnLine: 20
+PointerBindsToType: true
+SpaceBeforeAssignmentOperators: true
+SpaceBeforeParens: ControlStatements
+SpaceInEmptyParentheses: false
+SpacesBeforeTrailingComments: 1
+SpacesInAngles: false
+SpacesInCStyleCastParentheses: false
+SpaceAfterCStyleCast: true
+SpacesInContainerLiterals: true
+SpacesInParentheses: true
+Standard: Cpp11
+TabWidth: 4
+UseTab: Never
+
+AlignAfterOpenBracket: AlwaysBreak
+AlignConsecutiveAssignments: true
+CompactNamespaces: false
+ContinuationIndentWidth: 4
+IndentCaseLabels: true
+SpaceBeforeRangeBasedForLoopColon: true
+ForEachMacros: ['foreach']
+# StatementMacros: ['get_value']
+IndentPPDirectives: AfterHash
+SortIncludes: false
+
+ConstructorInitializerAllOnOneLineOrOnePerLine: true
+AllowShortBlocksOnASingleLine: false
+AllowAllParametersOfDeclarationOnNextLine: false
+
+BreakBeforeBraces: Custom
+BraceWrapping:
+    SplitEmptyNamespace: false
+    SplitEmptyRecord: false
+    SplitEmptyFunction: false
+    IndentBraces: false
+    BeforeElse: true
+    BeforeCatch: true
+    AfterExternBlock: true
+    AfterUnion: true
+    AfterStruct: true
+    AfterNamespace: true
+    AfterObjCDeclaration: true 
+    AfterFunction: true
+    AfterEnum: true
+    AfterControlStatement: true
+    AfterClass: true
