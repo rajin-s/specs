@@ -1,3 +1,5 @@
+use crate::language::nodes::*;
+
 pub struct TempName
 {
     name:   String,
@@ -18,4 +20,19 @@ impl TempName
         self.number += 1;
         format!("_{}_{}", self.name, self.number)
     }
+}
+
+pub fn print_types(node: &Node)
+{
+    let mut _params = ();
+
+    println!("Types:");
+    node.parse_recursive(print_type, &mut _params);
+    println!("");
+
+    fn print_type(node: &Node, _params: &mut ())
+    {
+        println!("\t{:8} : {}", format!("{}", node.get_type()), node);
+    }
+
 }

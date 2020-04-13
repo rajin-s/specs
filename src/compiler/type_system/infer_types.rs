@@ -55,7 +55,7 @@ fn infer_type(node: &mut Node, params: &mut Params)
 {
     match node
     {
-        Node::Nothing | Node::Integer(_) =>
+        Node::Nothing | Node::Integer(_) | Node::Boolean(_) =>
         {}
         Node::Variable(data) =>
         {
@@ -75,10 +75,44 @@ fn infer_type(node: &mut Node, params: &mut Params)
 
         Node::Call(data) =>
         {
-            // Infer types of operator and operands first
+            // Try to infer the types of operator and operands first
             data.recur_transformation(infer_type, params);
+            // note: currently no primitive operators actually depend on operand types
+            let (operator, operands, _) = data.get_all_mut();
 
-            // Then infer the type of the result
+            // Handle primitive operators whose types depend on operand types
+            if let Node::PrimitiveOperator(operator_data) = operator
+            {
+                match operator_data.get_operator()
+                {
+                    // compare : (T T) -> bool
+                    PrimitiveOperator::Equal
+                    | PrimitiveOperator::NotEqual
+                    | PrimitiveOperator::Less
+                    | PrimitiveOperator::Greater
+                    | PrimitiveOperator::LessEqual
+                    | PrimitiveOperator::GreaterEqual =>
+                    {
+                        if operands.len() >= 2
+                        {
+                            let a_type = operands[0].get_type();
+
+                            let operator_type = Type::from(CallableTypeData::new(
+                                vec![a_type.clone(), a_type.clone()],
+                                Type::new(DataType::Boolean),
+                            ));
+                            operator_data.set_type(operator_type);
+                        }
+                    }
+                    _ =>
+                    {
+                        // Other operators don't depend on operands
+                        // note: operator type should have already been found
+                    }
+                }
+            }
+
+            // Then infer the type of the result from the operator
             let operator_type = data.get_operator().get_type();
             if let DataType::Callable(operator_type_data) = operator_type.get_data_type()
             {
@@ -92,15 +126,57 @@ fn infer_type(node: &mut Node, params: &mut Params)
             PrimitiveOperator::Add =>
             {
                 let integer_type = Type::new(DataType::Integer);
-                let operator_type = CallableTypeData::new(
+                let operator_type = Type::from(CallableTypeData::new(
                     vec![integer_type.clone(), integer_type.clone()],
                     integer_type.clone(),
-                )
-                .to_type();
+                ));
 
                 data.set_type(operator_type);
             }
+            // ~ : (bool bool) -> bool
+            PrimitiveOperator::And | PrimitiveOperator::Or | PrimitiveOperator::ExclusiveOr =>
+            {
+                let boolean_type = Type::new(DataType::Boolean);
+                let operator_type = Type::from(CallableTypeData::new(
+                    vec![boolean_type.clone(), boolean_type.clone()],
+                    boolean_type.clone(),
+                ));
+
+                data.set_type(operator_type);
+            }
+            _ =>
+            {
+                // Any other operators depend on the operands, so their types need to be inferred at the call node
+            }
         },
+
+        Node::Reference(data) =>
+        {
+            // (ref v:T) : (ref T)
+
+            // Try to infer the type of the target first
+            data.recur_transformation(infer_type, params);
+
+            // The result is a reference to the original type
+            let target_type = data.get_target().get_type().clone();
+            let result_type = target_type.make_reference(data.get_reference_type());
+
+            data.set_type(result_type);
+        }
+        Node::Dereference(data) =>
+        {
+            // (deref v:&T) : T
+
+            // Try to infer the type of the target first
+            data.recur_transformation(infer_type, params);
+
+            // The result is dereferences the original type if possible
+            let target_type = data.get_target().get_type().clone();
+            if let Some(result_type) = target_type.make_dereference()
+            {
+                data.set_type(result_type);
+            }
+        }
 
         Node::Binding(data) =>
         {
@@ -129,6 +205,7 @@ fn infer_type(node: &mut Node, params: &mut Params)
         {
             node.recur_transformation(infer_type, params);
         }
+
         Node::Sequence(data) =>
         {
             if data.is_transparent()
@@ -164,6 +241,11 @@ fn infer_type(node: &mut Node, params: &mut Params)
                     }
                 }
             }
+        }
+        Node::Conditional(data) =>
+        {
+            // Infer types in the condition and branches
+            data.recur_transformation(infer_type, params);
         }
     }
 }

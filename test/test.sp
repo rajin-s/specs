@@ -1,21 +1,40 @@
-<<< ADDITION
-    EXAMPLES >>>
-let value-1 = 1
-let value-2 = value-1 + 1
+if foo {A} then
+else if bar {B} then
+else {C}
 
-let value-3 = {
-    let result = value-1 + value-2
-    result
-}
+#=>
 
-let value-4 = {
-    let value-4 = value-1 + value-1 + value-1
-    value-4 + 1
-}
+(if foo then {A} else (if bar then {B} else {C}))
 
-<<< REFERENCE
-    EXAMPLES >>>
+<<< ~ ~ ~ >>>
 
-let int-value = 1               # int int__value = 1;
-let int-ref   = (ref int-value) # int* int__ref = &int__value;
-(deref int-ref) = 2             # *int__ref = 2
+let some-cond = true
+let x = (if some-cond then 12 else 13)
+
+#=>
+
+let some-cond = true
+let x = Nothing
+if some-cond then { x = 12 }
+else { x = 13 }
+
+<<< ~ ~ ~ >>>
+
+(+
+    (if some-cond 1 else 2)
+    100
+)
+
+#=>
+
+let _temp = Nothing
+if some-cond (_temp = 1) else (_temp = 2)
+(+ _temp 100)
+
+<<< ~ ~ ~ >>>
+
+let foo = some-cond and {...}
+
+#=>
+
+let foo = (if some-cond (if {...} true) else false)

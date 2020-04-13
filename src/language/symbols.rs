@@ -87,12 +87,11 @@ pub mod operators
 {
     symbols![
         "not" => NOT,
-        "&" => REFERENCE,
-        "&mut" => MUTABLE_REFERENCE,
-        "*" => DEREFERENCE,
+        "ref" => REFERENCE,
+        "mut" => MUTABLE_REFERENCE,
+        "@" => DEREFERENCE,
         "." => ACCESS,
         "=" => ASSIGN,
-        "@" => INDEX,
         "+" => PLUS,
         "-" => MINUS,
         "*" => TIMES,
@@ -100,7 +99,7 @@ pub mod operators
         "%" => MODULO,
         "^" => POW,
         "==" => EQUAL,
-        "!=" => NOT_EQUAL,
+        "=/=" => NOT_EQUAL,
         "<" => LESS,
         ">" => GREATER,
         "<=" => LESS_EQUAL,
@@ -110,15 +109,15 @@ pub mod operators
         "xor" => XOR
     ];
 
-    pub const REFERENCE_CHAR: char = '&';
     pub const ACCESS_CHAR: char = '.';
 
     pub fn is_binary(s: &String) -> bool
     {
         match s.as_str()
         {
-            ACCESS | ASSIGN | INDEX | PLUS | MINUS | TIMES | DIVIDE | MODULO | POW | EQUAL
-            | NOT_EQUAL | LESS | GREATER | LESS_EQUAL | GREATER_EQUAL | AND | OR | XOR => true,
+            // ACCESS | ASSIGN | MINUS | TIMES | DIVIDE | MODULO | POW |
+            PLUS | EQUAL | NOT_EQUAL | LESS | GREATER | LESS_EQUAL | GREATER_EQUAL | AND | OR
+            | XOR => true,
             _ => false,
         }
     }
@@ -127,7 +126,8 @@ pub mod operators
     {
         match s.as_str()
         {
-            NOT | MINUS | REFERENCE | MUTABLE_REFERENCE | DEREFERENCE => true,
+            // NOT | MINUS | REFERENCE | MUTABLE_REFERENCE | DEREFERENCE => true,
+            REFERENCE | MUTABLE_REFERENCE | DEREFERENCE => true,
             _ => false,
         }
     }
@@ -143,7 +143,7 @@ pub mod keywords
         "public" => PUBLIC,
         "private" => PRIVATE,
         "if" => IF,
-        "?" => SHORT_IF,
+        "then" => THEN,
         "else" => ELSE,
         "#" => COMMENT
     ];

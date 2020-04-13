@@ -8,14 +8,20 @@ pub enum Node
 {
     Nothing,
     Integer(IntegerNodeData),
+    Boolean(BooleanNodeData),
     Variable(VariableNodeData),
 
     Call(CallNodeData),
     PrimitiveOperator(PrimitiveOperatorNodeData),
 
+    Reference(ReferenceNodeData),
+    Dereference(DereferenceNodeData),
+
     Binding(BindingNodeData),
     Assignment(AssignmentNodeData),
+
     Sequence(SequenceNodeData),
+    Conditional(ConditionalNodeData),
 }
 impl Node
 {
@@ -31,7 +37,7 @@ impl Node
 
         match self
         {
-            Nothing | Integer(_) | Variable(_) =>
+            Nothing | Integer(_) | Boolean(_) | Variable(_) =>
             {}
 
             Call(data) =>
@@ -45,6 +51,15 @@ impl Node
             PrimitiveOperator(_) =>
             {}
 
+            Reference(data) =>
+            {
+                data.get_target().parse_recursive(function, params);
+            }
+            Dereference(data) =>
+            {
+                data.get_target().parse_recursive(function, params);
+            }
+
             Binding(data) =>
             {
                 data.get_binding().parse_recursive(function, params);
@@ -54,12 +69,19 @@ impl Node
                 data.get_lhs().parse_recursive(function, params);
                 data.get_rhs().parse_recursive(function, params);
             }
+
             Sequence(data) =>
             {
                 for child in data.get_nodes().iter()
                 {
                     child.parse_recursive(function, params);
                 }
+            }
+            Conditional(data) =>
+            {
+                data.get_condition().parse_recursive(function, params);
+                data.get_then().parse_recursive(function, params);
+                data.get_else().parse_recursive(function, params);
             }
         }
     }
@@ -70,16 +92,22 @@ impl Typed for Node
     {
         match self
         {
-            Node::Nothing => Type::unknown_ref(),
+            Node::Nothing => Type::void_ref(),
             Node::Integer(data) => data.get_type(),
+            Node::Boolean(data) => data.get_type(),
             Node::Variable(data) => data.get_type(),
 
             Node::Call(data) => data.get_type(),
             Node::PrimitiveOperator(data) => data.get_type(),
 
-            Node::Binding(_) => Type::unknown_ref(),
-            Node::Assignment(_) => Type::unknown_ref(),
+            Node::Reference(data) => data.get_type(),
+            Node::Dereference(data) => data.get_type(),
+
+            Node::Binding(_) => Type::void_ref(),
+            Node::Assignment(_) => Type::void_ref(),
+
             Node::Sequence(data) => data.get_type(),
+            Node::Conditional(data) => data.get_type(),
         }
     }
 }
@@ -104,18 +132,23 @@ impl NodeRecur for Node
     {
         match self
         {
-            Node::Nothing =>
+            Node::Nothing
+            | Node::Integer(_)
+            | Node::Boolean(_)
+            | Node::Variable(_)
+            | Node::PrimitiveOperator(_) =>
             {}
-            Node::Integer(data) =>
-            {}
-            Node::Variable(data) =>
-            {}
+
             Node::Call(data) => data.recur_transformation(function, params),
-            Node::PrimitiveOperator(data) =>
-            {}
+
+            Node::Reference(data) => data.recur_transformation(function, params),
+            Node::Dereference(data) => data.recur_transformation(function, params),
+
             Node::Binding(data) => data.recur_transformation(function, params),
             Node::Assignment(data) => data.recur_transformation(function, params),
+
             Node::Sequence(data) => data.recur_transformation(function, params),
+            Node::Conditional(data) => data.recur_transformation(function, params),
         }
     }
 }
@@ -189,6 +222,32 @@ impl Typed for IntegerNodeData
 }
 impl_to_node!(IntegerNodeData, Node::Integer);
 
+pub struct BooleanNodeData
+{
+    value: bool,
+}
+impl BooleanNodeData
+{
+    pub fn get_value(&self) -> bool
+    {
+        return self.value;
+    }
+
+    pub fn new(value: bool) -> Self
+    {
+        return Self { value: value };
+    }
+}
+impl Typed for BooleanNodeData
+{
+    fn get_type(&self) -> &Type
+    {
+        static BOOLEAN_TYPE: Type = Type::new_constant(DataType::Boolean);
+        return &BOOLEAN_TYPE;
+    }
+}
+impl_to_node!(BooleanNodeData, Node::Boolean);
+
 pub struct VariableNodeData
 {
     name:      String,
@@ -249,6 +308,15 @@ impl CallNodeData
         return &mut self.operands;
     }
 
+    pub fn get_all_mut(&mut self) -> (&mut Node, &mut Vec<Node>, &mut Type)
+    {
+        return (
+            self.operator.as_mut(),
+            &mut self.operands,
+            &mut self.node_type,
+        );
+    }
+
     pub fn new(operator: Node, operands: Vec<Node>) -> Self
     {
         return Self {
@@ -298,6 +366,94 @@ impl PrimitiveOperatorNodeData
 }
 impl_typed!(PrimitiveOperatorNodeData);
 impl_to_node!(PrimitiveOperatorNodeData, Node::PrimitiveOperator);
+
+/* -------------------------------------------------------------------------- */
+/*                               Reference Nodes                              */
+/* -------------------------------------------------------------------------- */
+
+pub struct ReferenceNodeData
+{
+    reference_type: Reference,
+    target_node:    OtherNode,
+
+    node_type: Type,
+}
+impl ReferenceNodeData
+{
+    pub fn get_target(&self) -> &Node
+    {
+        return self.target_node.as_ref();
+    }
+    pub fn get_target_mut(&mut self) -> &mut Node
+    {
+        return self.target_node.as_mut();
+    }
+
+    pub fn get_reference_type(&self) -> Reference
+    {
+        return self.reference_type;
+    }
+
+    pub fn new(target_node: Node, reference_type: Reference) -> Self
+    {
+        return Self {
+            target_node:    OtherNode::new(target_node),
+            reference_type: reference_type,
+            node_type:      Type::unknown(),
+        };
+    }
+}
+impl NodeRecur for ReferenceNodeData
+{
+    fn recur_transformation<TParams>(
+        &mut self,
+        function: fn(&mut Node, &mut TParams),
+        params: &mut TParams,
+    )
+    {
+        function(self.get_target_mut(), params);
+    }
+}
+impl_typed!(ReferenceNodeData);
+impl_to_node!(ReferenceNodeData, Node::Reference);
+
+pub struct DereferenceNodeData
+{
+    target_node: OtherNode,
+    node_type:   Type,
+}
+impl DereferenceNodeData
+{
+    pub fn get_target(&self) -> &Node
+    {
+        return self.target_node.as_ref();
+    }
+    pub fn get_target_mut(&mut self) -> &mut Node
+    {
+        return self.target_node.as_mut();
+    }
+
+    pub fn new(target_node: Node) -> Self
+    {
+        return Self {
+            target_node: OtherNode::new(target_node),
+            node_type:   Type::unknown(),
+        };
+    }
+}
+impl NodeRecur for DereferenceNodeData
+{
+    fn recur_transformation<TParams>(
+        &mut self,
+        function: fn(&mut Node, &mut TParams),
+        params: &mut TParams,
+    )
+    {
+        function(self.get_target_mut(), params);
+    }
+}
+impl_typed!(DereferenceNodeData);
+impl_to_node!(DereferenceNodeData, Node::Dereference);
 
 /* -------------------------------------------------------------------------- */
 /*                              Structural Nodes                              */
@@ -425,6 +581,16 @@ impl SequenceNodeData
     {
         return &mut self.nodes;
     }
+
+    pub fn get_final_node(&self) -> Option<&Node>
+    {
+        return self.nodes.last();
+    }
+    pub fn get_final_node_mut(&mut self) -> Option<&mut Node>
+    {
+        return self.nodes.last_mut();
+    }
+
     pub fn is_transparent(&self) -> bool
     {
         return self.is_transparent;
@@ -475,3 +641,78 @@ impl Typed for SequenceNodeData
     }
 }
 impl_to_node!(SequenceNodeData, Node::Sequence);
+
+pub struct ConditionalNodeData
+{
+    condition_node: OtherNode,
+    then_node:      OtherNode,
+    else_node:      OtherNode,
+}
+impl ConditionalNodeData
+{
+    pub fn get_condition(&self) -> &Node
+    {
+        return self.condition_node.as_ref();
+    }
+    pub fn get_then(&self) -> &Node
+    {
+        return self.then_node.as_ref();
+    }
+    pub fn get_else(&self) -> &Node
+    {
+        return self.else_node.as_ref();
+    }
+
+    pub fn get_condition_mut(&mut self) -> &mut Node
+    {
+        return self.condition_node.as_mut();
+    }
+    pub fn get_then_mut(&mut self) -> &mut Node
+    {
+        return self.then_node.as_mut();
+    }
+    pub fn get_else_mut(&mut self) -> &mut Node
+    {
+        return self.else_node.as_mut();
+    }
+
+    pub fn has_else(&self) -> bool
+    {
+        if let Node::Nothing = self.get_else()
+        {
+            return false;
+        }
+
+        return true;
+    }
+
+    pub fn new(condition_node: Node, then_node: Node, else_node: Node) -> Self
+    {
+        return Self {
+            condition_node: OtherNode::new(condition_node),
+            then_node:      OtherNode::new(then_node),
+            else_node:      OtherNode::new(else_node),
+        };
+    }
+}
+impl NodeRecur for ConditionalNodeData
+{
+    fn recur_transformation<TParams>(
+        &mut self,
+        function: fn(&mut Node, &mut TParams),
+        params: &mut TParams,
+    )
+    {
+        function(self.get_condition_mut(), params);
+        function(self.get_then_mut(), params);
+        function(self.get_else_mut(), params);
+    }
+}
+impl Typed for ConditionalNodeData
+{
+    fn get_type(&self) -> &Type
+    {
+        return self.get_then().get_type();
+    }
+}
+impl_to_node!(ConditionalNodeData, Node::Conditional);

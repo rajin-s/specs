@@ -1,0 +1,78 @@
+Source Text:
+	let a = true
+	let b = false
+	
+	let c = 100 < 200
+	let d = a == b
+	let e = c =/= d
+	
+	if a and c and d and (e == d) then
+	{
+	    a
+	}
+	
+	let q = (a == (1 =/= 2))
+
+S-Expression Result:
+	<let a = true let b = false let c = 100 < 200 let d = a == b let e = c =/= d if a and c and d and (e == d) then {a} let q = (a == (1 =/= 2))>
+
+Preprocessor Result:
+	<(let a = true) (let b = false) (let c = (100 < 200)) (let d = (a == b)) (let e = (c =/= d)) (if (((a and c) and d) and (e == d)) then {a}) (let q = (a == (1 =/= 2)))>
+
+Parse Result:
+	{(let a = [bool true]) (let b = [bool false]) (let c = (< [int 100] [int 200])) (let d = (== [var a] [var b])) (let e = (=/= [var c] [var d])) (if (and (and (and [var a] [var c]) [var d]) (== [var e] [var d])) then {[var a]}) (let q = (== [var a] (=/= [int 1] [int 2])))}
+
+Types:
+	Void     : {(let a = [bool true]) (let b = [bool false]) (let c = (< [int 100] [int 200])) (let d = (== [var a] [var b])) (let e = (=/= [var c] [var d])) (if (and (and (and [var a] [var c]) [var d]) (== [var e] [var d])) then {[var a]}) (let q = (== [var a] (=/= [int 1] [int 2])))}
+	Void     : (let a = [bool true])
+	Bool     : [bool true]
+	Void     : (let b = [bool false])
+	Bool     : [bool false]
+	Void     : (let c = (< [int 100] [int 200]))
+	Bool     : (< [int 100] [int 200])
+	(Int Int -> Bool) : <
+	Int      : [int 100]
+	Int      : [int 200]
+	Void     : (let d = (== [var a] [var b]))
+	Bool     : (== [var a] [var b])
+	(Bool Bool -> Bool) : ==
+	Bool     : [var a]
+	Bool     : [var b]
+	Void     : (let e = (=/= [var c] [var d]))
+	Bool     : (=/= [var c] [var d])
+	(Bool Bool -> Bool) : =/=
+	Bool     : [var c]
+	Bool     : [var d]
+	Bool     : (if (and (and (and [var a] [var c]) [var d]) (== [var e] [var d])) then {[var a]})
+	Bool     : (and (and (and [var a] [var c]) [var d]) (== [var e] [var d]))
+	(Bool Bool -> Bool) : and
+	Bool     : (and (and [var a] [var c]) [var d])
+	(Bool Bool -> Bool) : and
+	Bool     : (and [var a] [var c])
+	(Bool Bool -> Bool) : and
+	Bool     : [var a]
+	Bool     : [var c]
+	Bool     : [var d]
+	Bool     : (== [var e] [var d])
+	(Bool Bool -> Bool) : ==
+	Bool     : [var e]
+	Bool     : [var d]
+	Bool     : {[var a]}
+	Bool     : [var a]
+	Void     : nothing
+	Void     : (let q = (== [var a] (=/= [int 1] [int 2])))
+	Bool     : (== [var a] (=/= [int 1] [int 2]))
+	(Bool Bool -> Bool) : ==
+	Bool     : [var a]
+	Bool     : (=/= [int 1] [int 2])
+	(Int Int -> Bool) : =/=
+	Int      : [int 1]
+	Int      : [int 2]
+
+C output:
+
+#include "specs_runtime.h"
+int _USER_MAIN() 
+{
+{ bool a = true;bool b = false;bool c = (100 < 200);bool d = (a == b);bool e = (c != d);if ((((a && c) && d) && (e == d))) {{ a; }};bool q = (a == (1 != 2)); }
+}

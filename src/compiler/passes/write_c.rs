@@ -20,26 +20,47 @@ fn get_c(node: &Node, indent: usize) -> String
             c_name
         }
         Node::Integer(data) => format!("{}", data.get_value()),
+        Node::Boolean(data) => format!("{}", data.get_value()),
 
         Node::Call(data) => match data.get_operator()
         {
-            Node::PrimitiveOperator(operator_data) => match operator_data.get_operator()
+            Node::PrimitiveOperator(operator_data) =>
             {
-                PrimitiveOperator::Add =>
-                {
-                    let operands = data.get_operands();
-                    let a_string = get_c(&operands[0], indent);
-                    let b_string = get_c(&operands[1], indent);
+                let operands = data.get_operands();
+                let a_string = get_c(&operands[0], indent);
+                let b_string = get_c(&operands[1], indent);
 
-                    format!("({} + {})", a_string, b_string)
+                let operator_string = match operator_data.get_operator()
+                {
+                    // Arithmetic operators
+                    PrimitiveOperator::Add => "+",
+
+                    // Comparison operators
+                    PrimitiveOperator::Equal => "==",
+                    PrimitiveOperator::NotEqual => "!=",
+                    PrimitiveOperator::Less => "<",
+                    PrimitiveOperator::Greater => ">",
+                    PrimitiveOperator::LessEqual => "<=",
+                    PrimitiveOperator::GreaterEqual => ">=",
+
+                    // Logical operators
+                    PrimitiveOperator::And => "&&",
+                    PrimitiveOperator::Or => "||",
+                    PrimitiveOperator::ExclusiveOr => "^",
                 }
-            },
+                .to_owned();
+
+                format!("({} {} {})", a_string, operator_string, b_string)
+            }
             _ => format!("/* invalid operator node: {} */", node),
         },
         Node::PrimitiveOperator(data) => format!(
             "/* unhandled primitive operator {:?} */",
             data.get_operator()
         ),
+
+        Node::Reference(data) => format!("(& {})", get_c(data.get_target(), indent)),
+        Node::Dereference(data) => format!("(* {})", get_c(data.get_target(), indent)),
 
         Node::Binding(data) =>
         {
@@ -63,6 +84,7 @@ fn get_c(node: &Node, indent: usize) -> String
 
             format!("{} = {}", lhs_string, rhs_string)
         }
+
         Node::Sequence(data) =>
         {
             let mut result = String::new();
@@ -82,15 +104,40 @@ fn get_c(node: &Node, indent: usize) -> String
                 format!("{{ {} }}", result)
             }
         }
+        Node::Conditional(data) =>
+        {
+            let condition_string = get_c(data.get_condition(), indent);
+            let then_string = get_c(data.get_then(), indent);
+
+            if data.has_else()
+            {
+                let else_string = get_c(data.get_else(), indent);
+                format!(
+                    "if ({}) {{{}}} else {{{}}}",
+                    condition_string, then_string, else_string
+                )
+            }
+            else
+            {
+                format!("if ({}) {{{}}}", condition_string, then_string)
+            }
+        }
     }
 }
 
 fn get_c_type(original_type: &Type) -> String
 {
-    match original_type.get_data_type()
+    let mut result = match original_type.get_data_type()
     {
         DataType::Integer => format!("int"),
         DataType::Void => format!("void"),
+        DataType::Boolean => format!("bool"),
         _ => format!("???"),
+    };
+
+    for _ in original_type.get_reference_layers().iter()
+    {
+        result.push('*');
     }
+    return result;
 }

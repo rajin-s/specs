@@ -1,10 +1,19 @@
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub enum Reference
+{
+    Immutable,
+    Mutable,
+}
+
 #[derive(Clone, PartialEq, Debug)]
 pub struct Type
 {
-    data_type: DataType,
+    data_type:        DataType,
+    reference_layers: Vec<Reference>,
 }
 impl Type
 {
+    // Interact with the data type
     pub fn get_data_type(&self) -> &DataType
     {
         return &self.data_type;
@@ -14,44 +23,104 @@ impl Type
         self.data_type = new_data_type;
     }
 
+    // Interact with reference layers
+    pub fn get_reference_layers(&self) -> &Vec<Reference>
+    {
+        return &self.reference_layers;
+    }
+    pub fn is_value(&self) -> bool
+    {
+        return self.reference_layers.is_empty();
+    }
+    pub fn is_reference(&self) -> bool
+    {
+        return !self.is_value();
+    }
+    pub fn is_mutable_reference(&self) -> bool
+    {
+        match self.reference_layers.last()
+        {
+            Some(Reference::Mutable) => true,
+            _ => false,
+        }
+    }
+
+    pub fn make_reference(&self, reference_type: Reference) -> Self
+    {
+        let mut new_type = self.clone();
+        new_type.reference_layers.push(reference_type);
+
+        return new_type;
+    }
+    pub fn make_dereference(&self) -> Option<Self>
+    {
+        // Make sure we aren't dereferencing a value
+        if self.is_reference()
+        {
+            let mut new_type = self.clone();
+            new_type.reference_layers.pop();
+
+            return Some(new_type);
+        }
+        else
+        {
+            return None;
+        }
+    }
+
     // Check if the type of the node is known yet
     pub fn is_unknown(&self) -> bool
     {
         return self.data_type == DataType::Unknown;
     }
-    pub fn is_known(&self) -> bool
-    {
-        return !self.is_unknown();
-    }
 
-    // Create a new type
+    // Create a new value type
     pub fn new(data_type: DataType) -> Self
     {
         return Type {
-            data_type: data_type,
+            data_type:        data_type,
+            reference_layers: Vec::new(),
         };
+    }
+
+    // Create a new type from some type data
+    pub fn from<T: ToType>(value: T) -> Self
+    {
+        return value.to_type();
     }
 
     // Create new type constants
     pub const fn unknown() -> Self
     {
         return Type {
-            data_type: DataType::Unknown,
+            data_type:        DataType::Unknown,
+            reference_layers: Vec::new(),
         };
     }
     pub const fn new_constant(data_type: DataType) -> Self
     {
         return Type {
-            data_type: data_type,
+            data_type:        data_type,
+            reference_layers: Vec::new(),
         };
     }
-
     // Get a reference to a static unknown type
     pub fn unknown_ref() -> &'static Self
     {
         static UNKNOWN_TYPE: Type = Type::unknown();
         return &UNKNOWN_TYPE;
     }
+    // Get a reference to a static void type
+    pub fn void_ref() -> &'static Self
+    {
+        static VOID_TYPE: Type = Type::new_constant(DataType::Void);
+        return &VOID_TYPE;
+    }
+}
+
+pub trait ToType
+{
+    fn to_type(self) -> Type;
 }
 
 /* -------------------------------------------------------------------------- */
@@ -64,6 +133,7 @@ pub enum DataType
     Unknown,
     Void,
     Integer,
+    Boolean,
     Callable(CallableTypeData),
 }
 
@@ -95,7 +165,10 @@ impl CallableTypeData
             return_type:    Box::new(return_type),
         };
     }
-    pub fn to_type(self) -> Type
+}
+impl ToType for CallableTypeData
+{
+    fn to_type(self) -> Type
     {
         return Type::new(DataType::Callable(self));
     }

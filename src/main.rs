@@ -1,9 +1,10 @@
+#![feature(const_vec_new)]
+
 use std::fs;
 
 mod compiler;
 mod language;
 mod parser;
-mod type_checker;
 
 use compiler::*;
 use language::nodes::*;
@@ -33,47 +34,39 @@ fn main()
 
     if let Ok(source) = fs::read_to_string(&input_path)
     {
-        println!("source input:");
-        println!("{}\n", source);
+        println!("Source Text:");
+        println!("\t{}\n", source.replace("\n", "\n\t"));
 
         let parser = Parser::new();
 
         if let Some(mut s_expression) = parser.parse_source(&source)
         {
-            println!("parse_source result:");
-            println!("{}\n", &s_expression);
+            println!("S-Expression Result:");
+            println!("\t{}\n", &s_expression);
+
             parser.preprocess(&mut s_expression);
-            println!("preprocess result:");
-            println!("{}\n", &s_expression);
+            println!("Preprocessor Result:");
+            println!("\t{}\n", &s_expression);
 
             match parser.parse(&s_expression)
             {
                 ParseResult::Ok(mut node) =>
                 {
-                    println!("parse result:");
-                    println!("{}\n", &node);
+                    println!("Parse Result:");
+                    println!("\t{}\n", &node);
 
-                    type_checker::infer_types::apply(&mut node);
-
-                    println!("types:");
-                    let mut no_params = ();
-                    node.parse_recursive(print_type, &mut no_params);
-                    println!("");
-
-                    let type_errors = type_checker::check_types::apply(&node);
-                    for error in type_errors.iter()
+                    let mut options = CompilerOptions::new();
                     {
-                        println!("Type error: {}", error);
+                        options.show_debug_output = true;
                     }
 
-                    if type_errors.len() == 0
+                    let mut compiler = Compiler::new(options, node);
+                    let compile_result = compiler.compile();
+
+                    if let Some(c_string) = compile_result
                     {
-                        let mut compiler = Compiler::new(node);
-                        let c_string = compiler.compile_c();
-
-                        println!("C output:");
+                        println!("C output:\n");
                         println!("{}", c_string);
-
                         fs::write(input_path.replace(".sp", ".c"), c_string);
                     }
                 }
@@ -105,9 +98,4 @@ fn main()
     {
         println!("Failed to open file: '{}'", &input_path);
     }
-
-    // let mut expr = SExpression::from_string(&source.unwrap());
-    // println!("{}", expr);
-    // preprocessor::make_groups(&mut expr);
-    // println!("{}", expr);
 }
