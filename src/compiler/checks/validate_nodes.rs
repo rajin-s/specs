@@ -202,9 +202,10 @@ fn check_node(node: &Node) -> Option<NodeErrors>
             // LHS can be
             //  - Variable
             //  - Dereference
+            //  - Conditional
             let lhs_error = match data.get_lhs()
             {
-                Node::Variable(_) | Node::Dereference(_) => None,
+                Node::Variable(_) | Node::Dereference(_) | Node::Conditional(_) => None,
                 _ => Some(NodeError::InvalidLHS(format!("{}", data.get_lhs()))),
             };
 
@@ -275,6 +276,13 @@ fn check_node(node: &Node) -> Option<NodeErrors>
                 None => None,
                 Some(error) => Some(vec![error]),
             }
+        }
+
+        Node::Function(_data) =>
+        {
+            // Function body can be
+            //  - Anything
+            None
         }
     }
 }

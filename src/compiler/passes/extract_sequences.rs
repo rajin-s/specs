@@ -1,347 +1,436 @@
-// /*
-// Impose restrictions on where sequence nodes can appear.
-// The following cases are valid in Specs, but invalid in C
-//     Binding:     let x = {...}
-//     Assignment:  x = {...}
-//     Calls:       ({...} {...})
-//     Reference:   (ref {...})
-//     Dereference: (@ {...})
+use super::utilities::TempNameGenerator;
+use crate::language::nodes::*;
+use std::mem::swap;
 
-// Bindings
-//     let x = { ... y }
-//     =>
-//     /
-//         let temp = nothing
-//         { ... (temp = y) }
-//         let x = temp
-//     \
+pub fn apply(root_node: &mut Node)
+{
+    let mut temp_names = TempNameGenerator::new("xseq");
+    root_node.recur_transformation(extract_sequences, &mut temp_names);
+}
 
-// Assignments
-//     x = { ... y }
-//     =>
-//     /
-//         let temp = nothing
-//         { ... (temp = y) }
-//         x = temp
-//     \
+// Helper functions
+fn make_temp_variable(name: &String, node_type: &Type) -> Node
+{
+    return Node::from(VariableNodeData::new_typed(name.clone(), node_type.clone()));
+}
 
-// Calls:
-//     ({... op} {... arg})
-//     =>
-//     /
-//         let temp_op = nothing
-//         { ... (temp_op = op) }
-//         let temp_arg = nothing
-//         { ... (temp_arg = arg) }
+fn extract_sequences(node: &mut Node, temp_names: &mut TempNameGenerator)
+{
+    // First make sure all child nodes are handled
+    node.recur_transformation(extract_sequences, temp_names);
 
-//         (temp_op temp_arg)
-//     \
-// Reference:
-//     (ref {... x})
-//     =>
-//     {
-//         let temp = nothing
-//         {... temp = (ref x)}
-//         temp
-//     }
-// Dereference:
-//     (deref {... x})
-//     =>
-//     {
-//         let temp  = nothing
-//         { ... temp = (deref x)}
-//         temp
-//     }
-// */
+    match node
+    {
+        Node::Nothing
+        | Node::Integer(_)
+        | Node::Boolean(_)
+        | Node::Variable(_)
+        | Node::PrimitiveOperator(_) =>
+        {}
 
-// use super::utilities::TempName;
-// use crate::language::nodes::*;
+        Node::Call(data) =>
+        {
+            /*
+                Operand
+                (F {... a} {... b})
+                =>
+                {
+                    let temp1 = Nothing
+                    {... (temp1 = a)}
 
-// pub fn apply(root: &mut Node)
-// {
-//     let mut temp_name = TempName::new("seqresult");
-//     extract(root, &mut temp_name);
-// }
+                    let temp2 = Nothing
+                    {... (temp2 = a)}
 
-// fn extract(node: &mut Node, temp_name_generator: &mut TempName)
-// {
-//     // Make sure bindings to sequences have been simplified in child nodes
-//     node.recur_transformation(extract, temp_name_generator);
+                    (F temp1 temp2)
+                }
 
-//     // Perform passes until no further passes are needed
-//     let mut needs_another_pass = extract_single_pass(node, temp_name_generator);
-//     while needs_another_pass == true
-//     {
-//         needs_another_pass = extract_single_pass(node, temp_name_generator);
-//     }
-// }
+                Operator
+                ({... F} a b c)
+                =>
+                {
+                    let temp = Nothing
+                    {... (temp = F)}
 
-// fn extract_single_pass(node: &mut Node, temp_name_generator: &mut TempName) -> bool
-// {
-//     match node
-//     {
-//         Node::Call(call_data) =>
-//         {
-//             // Handle operator first
-//             if let Node::Sequence(_) = call_data.get_operator()
-//             {
-//                 fn get_operator(node: &mut Node) -> &mut Node
-//                 {
-//                     if let Node::Call(data) = node
-//                     {
-//                         return data.get_operator_mut();
-//                     }
+                    # handle any opereand bindings here
 
-//                     unreachable!();
-//                 }
+                    (temp a b c)
+                }
+            */
 
-//                 lift_sequence(node, get_operator, temp_name_generator);
+            let mut operand_temp_nodes: Vec<Node> = Vec::new();
+            for operand in data.get_operands_mut().iter_mut()
+            {
+                if let Node::Sequence(_) = operand
+                {
+                    let temp_name = temp_names.next();
+                    let operand_type = operand.get_type().clone();
 
-//                 // We might need to do more passes for each operand
-//                 return true;
-//             }
+                    // Extract the target node, replacing it with a temporary variable
+                    let mut original_operand = make_temp_variable(&temp_name, &operand_type);
+                    swap(&mut original_operand, operand);
 
-//             // No more passes are needed
-//             return false;
-//         }
+                    // original_target -> (if ...)
+                    // target_node     -> [var temp]
 
-//         Node::Reference(data) => {
+                    if let Node::Sequence(mut sequence_data) = original_operand
+                    {
+                        let mut temp = Node::Nothing;
 
-//         }
-//         Node::Dereference(data) => {}
+                        // Convert final node into an assignment
+                        swap(&mut temp, sequence_data.get_final_node_mut().unwrap());
+                        temp = Node::from(AssignmentNodeData::new(
+                            make_temp_variable(&temp_name, &operand_type),
+                            temp,
+                        ));
 
-//         Node::Binding(binding_data) =>
-//         {
-//             if let Node::Sequence(_) = binding_data.get_binding()
-//             {
-//                 fn get_binding(node: &mut Node) -> &mut Node
-//                 {
-//                     if let Node::Binding(data) = node
-//                     {
-//                         return data.get_binding_mut();
-//                     }
+                        // The new RHS could be a sequence
+                        extract_sequences(&mut temp, temp_names);
 
-//                     unreachable!();
-//                 }
+                        swap(&mut temp, sequence_data.get_final_node_mut().unwrap());
 
-//                 lift_sequence(node, get_binding, temp_name_generator);
-//             }
+                        // let temp = Nothing
+                        let bind_temp = Node::from(BindingNodeData::new_empty(
+                            temp_name.clone(),
+                            operand_type.clone(),
+                        ));
 
-//             // Bindings will only ever need one pass
-//             return false;
-//         }
-//         Node::Assignment(assignment_data) =>
-//         {
-//             // Handle LHS first
-//             if let Node::Sequence(_) = assignment_data.get_lhs()
-//             {
-//                 fn get_lhs(node: &mut Node) -> &mut Node
-//                 {
-//                     if let Node::Assignment(data) = node
-//                     {
-//                         return data.get_lhs_mut();
-//                     }
+                        // {... (temp = a)}
+                        let assign_temp = Node::from(sequence_data);
 
-//                     unreachable!();
-//                 }
+                        operand_temp_nodes.push(bind_temp);
+                        operand_temp_nodes.push(assign_temp);
+                    }
+                    else
+                    {
+                        // If we called lift_sequence, we know the target is a conditional
+                        unreachable!();
+                    }
+                }
+            }
 
-//                 lift_sequence_with_reference(node, get_lhs, temp_name_generator);
+            if let Node::Sequence(_) = data.get_operator()
+            {
+                fn get_operator(node: &mut Node) -> &mut Node
+                {
+                    if let Node::Call(data) = node
+                    {
+                        return data.get_operator_mut();
+                    }
 
-//                 // We might need to another pass for the LHS
-//                 return true;
-//             }
-//             else if let Node::Sequence(_) = assignment_data.get_rhs()
-//             {
-//                 fn get_rhs(node: &mut Node) -> &mut Node
-//                 {
-//                     if let Node::Assignment(data) = node
-//                     {
-//                         return data.get_rhs_mut();
-//                     }
+                    unreachable!();
+                }
 
-//                     unreachable!();
-//                 }
+                // Get the temp binding and assignment nodes for the operator
+                let mut operator_temp_nodes =
+                    lift_sequence_no_overwrite(node, get_operator, temp_names);
 
-//                 lift_sequence(node, get_rhs, temp_name_generator);
-//             }
+                // Handle any operand bindings after the operator
+                operator_temp_nodes.append(&mut operand_temp_nodes);
 
-//             // No more passes are needed
-//             return false;
-//         }
-//         _ =>
-//         {
-//             return false;
-//         }
-//     }
-// }
+                // Make the enclosing group
+                make_sequence(node, operator_temp_nodes);
+            }
+            else if operand_temp_nodes.len() > 0
+            {
+                // Make the enclosing sequence
+                make_sequence(node, operand_temp_nodes);
+            }
+        }
 
-// fn lift_sequence(
-//     original_node: &mut Node,
-//     target_node_accessor: fn(&mut Node) -> &mut Node,
-//     temp_name_generator: &mut TempName,
-// )
-// {
-//     // Helper functions
-//     fn make_temp_variable(name: &String, node_type: &Type) -> Node
-//     {
-//         return Node::from(VariableNodeData::new_typed(name.clone(), node_type.clone()));
-//     }
+        Node::Reference(data) =>
+        {
+            /* Reference
+                (ref {... a})
+                =>
+                { ???
+                    let temp = Nothing
+                    {... (temp = a)}
+                    (ref temp)
+                }
+            */
 
-//     use std::mem::swap;
+            if let Node::Sequence(_) = data.get_target()
+            {
+                fn get_target(node: &mut Node) -> &mut Node
+                {
+                    if let Node::Reference(data) = node
+                    {
+                        return data.get_target_mut();
+                    }
 
-//     // Get the target node from the original node
-//     // note: this is needed because we can't borrow both at the same time as function arguments
-//     let target_node = target_node_accessor(original_node);
+                    unreachable!();
+                }
 
-//     // Create a temporary variable to hold the result of the sequence
-//     let temp_name = temp_name_generator.next();
-//     let result_type = target_node.get_type().clone();
+                lift_sequence(node, get_target, temp_names);
+            }
+        }
+        Node::Dereference(data) =>
+        {
+            /* Dereference
+            (deref {... a})
+            =>
+            {
+                let temp = Nothing
+                {... temp = a}
+                (deref temp)
+            }
+            */
 
-//     // Extract the target node
-//     let mut original_target = make_temp_variable(&temp_name, &result_type);
-//     let new_target = target_node;
-//     swap(&mut original_target, new_target);
+            if let Node::Sequence(_) = data.get_target()
+            {
+                fn get_target(node: &mut Node) -> &mut Node
+                {
+                    if let Node::Dereference(data) = node
+                    {
+                        return data.get_target_mut();
+                    }
 
-//     // original_target -> the sequence that is being extracted
-//     // new_target      -> a new temporary variable put in place of the sequence
+                    unreachable!();
+                }
 
-//     if let Node::Sequence(mut sequence_data) = original_target
-//     {
-//         // Change the last node of the sequence to an assignment of to the new temporary variable
-//         if let Some(final_sequence_node) = sequence_data.get_nodes_mut().last_mut()
-//         {
-//             // Extract the final node of the sequence
-//             let mut final_node = Node::Nothing;
-//             let placeholder = final_sequence_node;
-//             swap(&mut final_node, placeholder);
+                lift_sequence(node, get_target, temp_names);
+            }
+        }
 
-//             // Turn the final node into an assignment
-//             final_node = Node::from(AssignmentNodeData::new(
-//                 make_temp_variable(&temp_name, &result_type),
-//                 final_node,
-//             ));
+        Node::Binding(data) =>
+        {
+            /* Binding
+                (let x = {... a})
+                =>
+                /
+                    let temp = Nothing
+                    {... (temp = a)}
+                    let x = temp
+                \
+            */
+            if let Node::Sequence(_) = data.get_binding()
+            {
+                fn get_binding(node: &mut Node) -> &mut Node
+                {
+                    if let Node::Binding(data) = node
+                    {
+                        return data.get_binding_mut();
+                    }
 
-//             // Make sure the RHS of the assignment isn't also a sequence
-//             extract(&mut final_node, temp_name_generator);
+                    unreachable!();
+                }
 
-//             // Put the assignment back at the end of the sequence
-//             swap(&mut final_node, placeholder);
-//         }
-//         else
-//         {
-//             // If there weren't any nodes, this would not have passed type checking
-//             unreachable!();
-//         }
+                lift_sequence(node, get_binding, temp_names);
+            }
+        }
+        Node::Assignment(data) =>
+        {
+            /*
+                RHS
+                x = {... a}
+                =>
+                {
+                    let temp = Nothing
+                    {... (temp = a)}
+                    x = temp
+                }
+            */
 
-//         // let temp = nothing
-//         let bind_temp = Node::from(BindingNodeData::new_empty(temp_name.clone(), result_type));
+            if let Node::Sequence(_) = data.get_rhs()
+            {
+                fn get_rhs(node: &mut Node) -> &mut Node
+                {
+                    if let Node::Assignment(data) = node
+                    {
+                        return data.get_rhs_mut();
+                    }
 
-//         // { ... (temp = something) }
-//         let assign_temp = Node::from(sequence_data);
+                    unreachable!();
+                }
 
-//         // Extract the original node, which now uses temp in place of a sequence
-//         let mut use_temp = Node::Nothing;
-//         swap(&mut use_temp, original_node);
+                lift_sequence(node, get_rhs, temp_names);
+            }
+        }
 
-//         // Create the new enclosing sequence
-//         let mut outer_sequence = Node::from(SequenceNodeData::new_transparent(vec![
-//             bind_temp,
-//             assign_temp,
-//             use_temp,
-//         ]));
+        Node::Sequence(data) =>
+        {
+            /* Sequence
+                {
+                    ...
+                    {... a}
+                }
+                =>
+                let temp = Nothing
+                {
+                    ...
+                    {... (temp = a)}
+                }
+            */
 
-//         // Replace the original node with the new sequence
-//         swap(&mut outer_sequence, original_node);
-//     }
-//     else
-//     {
-//         // We already checked that the target was a sequence
-//         unreachable!();
-//     }
-// }
+            // Don't worry about void sequences
+            if !data.get_type().is_void()
+            {
+                if let Some(Node::Sequence(_)) = data.get_final_node()
+                {
+                    fn get_final_node(node: &mut Node) -> &mut Node
+                    {
+                        if let Node::Sequence(data) = node
+                        {
+                            return data.get_final_node_mut().unwrap();
+                        }
+                        unreachable!();
+                    }
+                    lift_sequence(node, get_final_node, temp_names);
+                }
+            }
+        }
+        Node::Conditional(data) =>
+        {
+            /* Condition
+                if {... a} then b else c
+                =>
+                let temp = Nothing
+                {... (temp = a)}
+                if temp then b else c
+            */
+            if let Node::Sequence(_) = data.get_condition()
+            {
+                unimplemented!();
+            }
+        }
 
-// fn lift_sequence_with_reference(
-//     original_node: &mut Node,
-//     target_node_accessor: fn(&mut Node) -> &mut Node,
-//     temp_name_generator: &mut TempName,
-// )
-// {
-//     // Helper functions
-//     fn make_temp_variable(name: &String, node_type: &Type) -> Node
-//     {
-//         return Node::from(VariableNodeData::new_typed(name.clone(), node_type.clone()));
-//     }
+        Node::Function(_data) =>
+        {
+            // Functions don't need to change
+        }
+    }
+}
 
-//     use std::mem::swap;
+fn lift_sequence(
+    original_node: &mut Node,
+    target_node_accessor: fn(&mut Node) -> &mut Node,
+    temp_names: &mut TempNameGenerator,
+)
+{
+    // Get the target node from the original node
+    // note: this is needed because we can't borrow both at the same time as function arguments
+    let target_node = target_node_accessor(original_node);
 
-//     // Get the target node from the original node
-//     // note: this is needed because we can't borrow both at the same time as function arguments
-//     let target_node = target_node_accessor(original_node);
+    let temp_name = temp_names.next();
+    let target_type = target_node.get_type().clone();
 
-//     // Create a temporary variable to hold the result of the sequence
-//     let temp_name = temp_name_generator.next();
-//     let result_type = target_node.get_type();
-//     let temp_type = result_type.make_reference(Reference::Mutable);
+    // Extract the target node, replacing it with a temporary variable
+    let mut original_target = make_temp_variable(&temp_name, &target_type);
+    swap(&mut original_target, target_node);
 
-//     // Extract the target node, replacing it with (deref temp)
-//     let mut original_target = make_temp_variable(&temp_name, &result_type);
-//     let new_target = target_node;
-//     swap(&mut original_target, new_target);
+    // original_target -> (if ...)
+    // target_node     -> [var temp]
 
-//     // original_target -> the sequence that is being extracted
-//     // new_target      -> a new temporary variable put in place of the sequence
+    if let Node::Sequence(mut sequence_data) = original_target
+    {
+        let mut temp = Node::Nothing;
 
-//     if let Node::Sequence(mut sequence_data) = original_target
-//     {
-//         // Change the last node of the sequence to an assignment of to the new temporary variable
-//         if let Some(final_sequence_node) = sequence_data.get_nodes_mut().last_mut()
-//         {
-//             // Extract the final node of the sequence
-//             let mut final_node = Node::Nothing;
-//             let placeholder = final_sequence_node;
-//             swap(&mut final_node, placeholder);
+        // Convert final node into an assignment
+        swap(&mut temp, sequence_data.get_final_node_mut().unwrap());
+        temp = Node::from(AssignmentNodeData::new(
+            make_temp_variable(&temp_name, &target_type),
+            temp,
+        ));
 
-//             // Turn the final node into an assignment
-//             final_node = Node::from(AssignmentNodeData::new(
-//                 make_temp_variable(&temp_name, &result_type),
-//                 final_node,
-//             ));
+        // The new RHS could be a sequence
+        extract_sequences(&mut temp, temp_names);
 
-//             // Make sure the RHS of the assignment isn't also a sequence
-//             extract(&mut final_node, temp_name_generator);
+        swap(&mut temp, sequence_data.get_final_node_mut().unwrap());
 
-//             // Put the assignment back at the end of the sequence
-//             swap(&mut final_node, placeholder);
-//         }
-//         else
-//         {
-//             // If there weren't any nodes, this would not have passed type checking
-//             unreachable!();
-//         }
+        // let temp = Nothing
+        let bind_temp = Node::from(BindingNodeData::new_empty(
+            temp_name.clone(),
+            target_type.clone(),
+        ));
 
-//         // let temp = nothing
-//         let bind_temp = Node::from(BindingNodeData::new_empty(temp_name.clone(), result_type));
+        // {... (temp = a)}
+        let assign_temp = Node::from(sequence_data);
 
-//         // { ... (temp = something) }
-//         let assign_temp = Node::from(sequence_data);
+        // Extract the original node, which now uses temp in place of a conditional
+        let mut use_temp = Node::Nothing;
+        swap(&mut use_temp, original_node);
 
-//         // Extract the original node, which now uses temp in place of a sequence
-//         let mut use_temp = Node::Nothing;
-//         swap(&mut use_temp, original_node);
+        // Create the new enclosing sequence
+        let mut outer_sequence = Node::from(SequenceNodeData::new_transparent(vec![
+            bind_temp,
+            assign_temp,
+            use_temp,
+        ]));
 
-//         // Create the new enclosing sequence
-//         let mut outer_sequence = Node::from(SequenceNodeData::new_transparent(vec![
-//             bind_temp,
-//             assign_temp,
-//             use_temp,
-//         ]));
+        // Replace the original node with the new sequence
+        swap(&mut outer_sequence, original_node);
+    }
+    else
+    {
+        // If we called lift_sequence, we know the target is a conditional
+        unreachable!();
+    }
+}
 
-//         // Replace the original node with the new sequence
-//         swap(&mut outer_sequence, original_node);
-//     }
-//     else
-//     {
-//         // We already checked that the target was a sequence
-//         unreachable!();
-//     }
-// }
+fn lift_sequence_no_overwrite(
+    original_node: &mut Node,
+    target_node_accessor: fn(&mut Node) -> &mut Node,
+    temp_names: &mut TempNameGenerator,
+) -> Vec<Node>
+{
+    // Get the target node from the original node
+    // note: this is needed because we can't borrow both at the same time as function arguments
+    let target_node = target_node_accessor(original_node);
+
+    let temp_name = temp_names.next();
+    let target_type = target_node.get_type().clone();
+
+    // Extract the target node, replacing it with a temporary variable
+    let mut original_target = make_temp_variable(&temp_name, &target_type);
+    swap(&mut original_target, target_node);
+
+    // original_target -> (if ...)
+    // target_node     -> [var temp]
+
+    if let Node::Sequence(mut sequence_data) = original_target
+    {
+        let mut temp = Node::Nothing;
+
+        // Convert final node into an assignment
+        swap(&mut temp, sequence_data.get_final_node_mut().unwrap());
+        temp = Node::from(AssignmentNodeData::new(
+            make_temp_variable(&temp_name, &target_type),
+            temp,
+        ));
+
+        // The new RHS could be a sequence
+        extract_sequences(&mut temp, temp_names);
+
+        swap(&mut temp, sequence_data.get_final_node_mut().unwrap());
+
+        // let temp = Nothing
+        let bind_temp = Node::from(BindingNodeData::new_empty(
+            temp_name.clone(),
+            target_type.clone(),
+        ));
+
+        // {... (temp = a)}
+        let assign_temp = Node::from(sequence_data);
+
+        return vec![bind_temp, assign_temp];
+    }
+    else
+    {
+        // If we called lift_sequence, we know the target is a conditional
+        unreachable!();
+    }
+}
+
+fn make_sequence(original_node: &mut Node, mut before: Vec<Node>)
+{
+    // Extract the original node, which now uses temp in place of a conditional
+    let mut use_temp = Node::Nothing;
+    swap(&mut use_temp, original_node);
+
+    // Create the new enclosing sequence
+    before.push(use_temp);
+    let mut outer_sequence = Node::from(SequenceNodeData::new_transparent(before));
+
+    // Replace the original node with the new sequence
+    swap(&mut outer_sequence, original_node);
+}

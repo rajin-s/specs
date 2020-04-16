@@ -73,6 +73,18 @@ impl Type
     {
         return self.data_type == DataType::Unknown;
     }
+    pub fn is_void(&self) -> bool
+    {
+        return self.data_type == DataType::Void;
+    }
+    pub fn is_callable(&self) -> bool
+    {
+        match (&self.data_type, self.reference_layers.is_empty())
+        {
+            (DataType::Callable(_), true) => true,
+            _ => false,
+        }
+    }
 
     // Create a new value type
     pub fn new(data_type: DataType) -> Self

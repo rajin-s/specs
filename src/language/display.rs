@@ -85,6 +85,16 @@ impl fmt::Display for Node
                     write!(f, "(if {} then {})", data.get_condition(), data.get_then())
                 }
             }
+
+            Node::Function(data) =>
+            {
+                write!(f, "<fn {} ", data.get_name());
+                for argument in data.get_arguments().iter()
+                {
+                    write!(f, "[{} {}] ", argument.get_name(), argument.get_type());
+                }
+                write!(f, "-> {} {}>", data.get_return_type(), data.get_body())
+            }
         }
     }
 }

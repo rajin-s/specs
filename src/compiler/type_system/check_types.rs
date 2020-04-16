@@ -16,6 +16,8 @@ pub enum TypeError
 
     InvalidConditionType(Type),
     NonmatchingBranchTypes(Type, Type),
+
+    NonmatchingReturnType(String, Type, Type),
 }
 type TypeErrors = Vec<TypeError>;
 
@@ -142,15 +144,24 @@ fn check_type(node: &Node, errors: &mut TypeErrors)
                 ));
             }
 
-            if data.has_else()
+            if data.get_else().get_type() != data.get_then().get_type()
             {
-                if data.get_else().get_type() != data.get_then().get_type()
-                {
-                    new_errors.push(TypeError::NonmatchingBranchTypes(
-                        data.get_then().get_type().clone(),
-                        data.get_else().get_type().clone(),
-                    ));
-                }
+                new_errors.push(TypeError::NonmatchingBranchTypes(
+                    data.get_then().get_type().clone(),
+                    data.get_else().get_type().clone(),
+                ));
+            }
+        }
+
+        Node::Function(data) =>
+        {
+            if data.get_return_type() != data.get_body().get_type()
+            {
+                new_errors.push(TypeError::NonmatchingReturnType(
+                    data.get_name().clone(),
+                    data.get_return_type().clone(),
+                    data.get_body().get_type().clone(),
+                ));
             }
         }
     }
@@ -199,6 +210,12 @@ impl fmt::Display for TypeError
                 f,
                 "Else branch doesn't match then branch: expected {}, found {}",
                 then_t, else_t
+            ),
+
+            NonmatchingReturnType(function_name, expected, found) => write!(
+                f,
+                "Function '{}' body doesn't match return type: expected {}, found {}",
+                function_name, expected, found
             ),
         }
     }

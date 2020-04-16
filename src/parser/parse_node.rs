@@ -8,8 +8,7 @@ use super::ParseResult;
 
 pub fn parse_node_recursive(expression: &SExpression) -> ParseResult
 {
-    use ParseResult::*;
-    use SExpression::Symbol;
+    use SExpression::*;
 
     let mut errors = ParseErrorList::new();
 
@@ -62,15 +61,15 @@ pub fn parse_node_recursive(expression: &SExpression) -> ParseResult
                                     }
                                     (a_result, b_result) =>
                                     {
-                                        if let Error(mut new_errors) = a_result
+                                        if let Err(mut new_errors) = a_result
                                         {
                                             errors.append(&mut new_errors);
                                         }
-                                        if let Error(mut new_errors) = b_result
+                                        if let Err(mut new_errors) = b_result
                                         {
                                             errors.append(&mut new_errors);
                                         }
-                                        return Error(errors);
+                                        return Err(errors);
                                     }
                                 }
                             }
@@ -80,7 +79,7 @@ pub fn parse_node_recursive(expression: &SExpression) -> ParseResult
                                     "Unhandled primitive binary operator {}",
                                     op
                                 )));
-                                return Error(errors);
+                                return Err(errors);
                             }
                         }
                         // (ref a)
@@ -97,10 +96,10 @@ pub fn parse_node_recursive(expression: &SExpression) -> ParseResult
                                     ));
                                     return Ok(node);
                                 }
-                                Error(mut new_errors) =>
+                                Err(mut new_errors) =>
                                 {
                                     errors.append(&mut new_errors);
-                                    return Error(errors);
+                                    return Err(errors);
                                 }
                             }
                         }
@@ -118,10 +117,10 @@ pub fn parse_node_recursive(expression: &SExpression) -> ParseResult
                                     ));
                                     return Ok(node);
                                 }
-                                Error(mut new_errors) =>
+                                Err(mut new_errors) =>
                                 {
                                     errors.append(&mut new_errors);
-                                    return Error(errors);
+                                    return Err(errors);
                                 }
                             }
                         }
@@ -136,10 +135,10 @@ pub fn parse_node_recursive(expression: &SExpression) -> ParseResult
                                     let node = Node::from(DereferenceNodeData::new(target_node));
                                     return Ok(node);
                                 }
-                                Error(mut new_errors) =>
+                                Err(mut new_errors) =>
                                 {
                                     errors.append(&mut new_errors);
-                                    return Error(errors);
+                                    return Err(errors);
                                 }
                             }
                         }
@@ -159,10 +158,10 @@ pub fn parse_node_recursive(expression: &SExpression) -> ParseResult
                                     ));
                                     return Ok(node);
                                 }
-                                Error(mut new_errors) =>
+                                Err(mut new_errors) =>
                                 {
                                     errors.append(&mut new_errors);
-                                    return Error(errors);
+                                    return Err(errors);
                                 }
                             }
                         }
@@ -182,15 +181,15 @@ pub fn parse_node_recursive(expression: &SExpression) -> ParseResult
                                 }
                                 (a_result, b_result) =>
                                 {
-                                    if let Error(mut new_errors) = a_result
+                                    if let Err(mut new_errors) = a_result
                                     {
                                         errors.append(&mut new_errors);
                                     }
-                                    if let Error(mut new_errors) = b_result
+                                    if let Err(mut new_errors) = b_result
                                     {
                                         errors.append(&mut new_errors);
                                     }
-                                    return Error(errors);
+                                    return Err(errors);
                                 }
                             }
                         }
@@ -219,20 +218,20 @@ pub fn parse_node_recursive(expression: &SExpression) -> ParseResult
                                 }
                                 (condition_result, then_result, else_result) =>
                                 {
-                                    if let Error(mut new_errors) = condition_result
+                                    if let Err(mut new_errors) = condition_result
                                     {
                                         errors.append(&mut new_errors);
                                     }
-                                    if let Error(mut new_errors) = then_result
+                                    if let Err(mut new_errors) = then_result
                                     {
                                         errors.append(&mut new_errors);
                                     }
-                                    if let Error(mut new_errors) = else_result
+                                    if let Err(mut new_errors) = else_result
                                     {
                                         errors.append(&mut new_errors);
                                     }
 
-                                    return Error(errors);
+                                    return Err(errors);
                                 }
                             }
                         }
@@ -258,16 +257,192 @@ pub fn parse_node_recursive(expression: &SExpression) -> ParseResult
                                 }
                                 (condition_result, then_result) =>
                                 {
-                                    if let Error(mut new_errors) = condition_result
+                                    if let Err(mut new_errors) = condition_result
                                     {
                                         errors.append(&mut new_errors);
                                     }
-                                    if let Error(mut new_errors) = then_result
+                                    if let Err(mut new_errors) = then_result
                                     {
                                         errors.append(&mut new_errors);
                                     }
-                                    return Error(errors);
+                                    return Err(errors);
                                 }
+                            }
+                        }
+
+                        // (fn name {body})
+                        [Symbol(function_keyword), Symbol(name), body_expression]
+                            if function_keyword == symbols::keywords::FUNCTION =>
+                        {
+                            if let List(BracketType::Curly, _) = body_expression
+                            {
+                                let body_result = parse_node_recursive(body_expression);
+                                match body_result
+                                {
+                                    Ok(body_node) =>
+                                    {
+                                        let node = Node::from(FunctionNodeData::new(
+                                            name.clone(),
+                                            Vec::new(),
+                                            Type::new(DataType::Void),
+                                            body_node,
+                                        ));
+
+                                        return Ok(node);
+                                    }
+                                    Err(mut new_errors) =>
+                                    {
+                                        errors.append(&mut new_errors);
+                                        return Err(errors);
+                                    }
+                                }
+                            }
+                            else
+                            {
+                                errors.push(ParseError::InvalidFunctionBody(
+                                    name.clone(),
+                                    "Expected {...} list".to_owned(),
+                                ));
+                                return Err(errors);
+                            }
+                        }
+                        // (fn name <arguments> {body})
+                        [Symbol(function_keyword), Symbol(name), List(BracketType::None, argument_expressions), body_expression]
+                            if function_keyword == symbols::keywords::FUNCTION =>
+                        {
+                            if let List(BracketType::Curly, _) = body_expression
+                            {
+                                let body_result = parse_node_recursive(body_expression);
+                                match body_result
+                                {
+                                    Ok(body_node) => match parse_arguments(argument_expressions)
+                                    {
+                                        Ok(arguments) =>
+                                        {
+                                            let node = Node::from(FunctionNodeData::new(
+                                                name.clone(),
+                                                arguments,
+                                                Type::new(DataType::Void),
+                                                body_node,
+                                            ));
+                                            return Ok(node);
+                                        }
+                                        Err(mut new_errors) =>
+                                        {
+                                            errors.append(&mut new_errors);
+                                            return Err(errors);
+                                        }
+                                    },
+                                    Err(mut new_errors) =>
+                                    {
+                                        errors.append(&mut new_errors);
+                                        return Err(errors);
+                                    }
+                                }
+                            }
+                            else
+                            {
+                                errors.push(ParseError::InvalidFunctionBody(
+                                    name.clone(),
+                                    "Expected {...} list".to_owned(),
+                                ));
+                                return Err(errors);
+                            }
+                        }
+                        // (fn name -> T {body})
+                        [Symbol(function_keyword), Symbol(name), Symbol(arrow_keyword), return_type_expression, body_expression]
+                            if function_keyword == symbols::keywords::FUNCTION
+                                && arrow_keyword == symbols::keywords::ARROW =>
+                        {
+                            if let List(BracketType::Curly, _) = body_expression
+                            {
+                                let body_result = parse_node_recursive(body_expression);
+                                match body_result
+                                {
+                                    Ok(body_node) => match parse_type(return_type_expression)
+                                    {
+                                        Ok(return_type) =>
+                                        {
+                                            let node = Node::from(FunctionNodeData::new(
+                                                name.clone(),
+                                                Vec::new(),
+                                                return_type,
+                                                body_node,
+                                            ));
+                                            return Ok(node);
+                                        }
+                                        Err(mut new_errors) =>
+                                        {
+                                            errors.append(&mut new_errors);
+                                            return Err(errors);
+                                        }
+                                    },
+                                    Err(mut new_errors) =>
+                                    {
+                                        errors.append(&mut new_errors);
+                                        return Err(errors);
+                                    }
+                                }
+                            }
+                            else
+                            {
+                                errors.push(ParseError::InvalidFunctionBody(
+                                    name.clone(),
+                                    "Expected {...} list".to_owned(),
+                                ));
+                                return Err(errors);
+                            }
+                        }
+                        // (fn name -> T <arguments> {body})
+                        [Symbol(function_keyword), Symbol(name), List(BracketType::None, argument_expressions), Symbol(arrow_keyword), return_type_expression, body_expression]
+                            if function_keyword == symbols::keywords::FUNCTION
+                                && arrow_keyword == symbols::keywords::ARROW =>
+                        {
+                            if let List(BracketType::Curly, _) = body_expression
+                            {
+                                let body_result = parse_node_recursive(body_expression);
+                                match body_result
+                                {
+                                    Ok(body_node) => match parse_arguments(argument_expressions)
+                                    {
+                                        Ok(arguments) => match parse_type(return_type_expression)
+                                        {
+                                            Ok(return_type) =>
+                                            {
+                                                let node = Node::from(FunctionNodeData::new(
+                                                    name.clone(),
+                                                    arguments,
+                                                    return_type,
+                                                    body_node,
+                                                ));
+                                                return Ok(node);
+                                            }
+                                            Err(mut new_errors) =>
+                                            {
+                                                errors.append(&mut new_errors);
+                                                return Err(errors);
+                                            }
+                                        },
+                                        Err(mut new_errors) =>
+                                        {
+                                            errors.append(&mut new_errors);
+                                            return Err(errors);
+                                        }
+                                    },
+                                    Err(mut new_errors) =>
+                                    {
+                                        errors.append(&mut new_errors);
+                                        return Err(errors);
+                                    }
+                                }
+                            }
+                            else
+                            {
+                                errors.push(ParseError::InvalidFunctionBody(
+                                    name.clone(),
+                                    "Expected {...} list".to_owned(),
+                                ));
+                                return Err(errors);
                             }
                         }
 
@@ -283,7 +458,7 @@ pub fn parse_node_recursive(expression: &SExpression) -> ParseResult
                                     match parse_node_recursive(&elements[i])
                                     {
                                         Ok(node) => operands.push(node),
-                                        Error(mut new_errors) => errors.append(&mut new_errors),
+                                        Err(mut new_errors) => errors.append(&mut new_errors),
                                     }
                                 }
                                 match operator_result
@@ -298,20 +473,20 @@ pub fn parse_node_recursive(expression: &SExpression) -> ParseResult
                                         }
                                         else
                                         {
-                                            return Error(errors);
+                                            return Err(errors);
                                         }
                                     }
-                                    Error(mut new_errors) =>
+                                    Err(mut new_errors) =>
                                     {
                                         errors.append(&mut new_errors);
-                                        return Error(errors);
+                                        return Err(errors);
                                     }
                                 }
                             }
                             else
                             {
                                 errors.push(ParseError::InvalidSExpression(expression.clone()));
-                                return Error(errors);
+                                return Err(errors);
                             }
                         }
                     }
@@ -326,7 +501,7 @@ pub fn parse_node_recursive(expression: &SExpression) -> ParseResult
                         match parse_node_recursive(element)
                         {
                             Ok(node) => nodes.push(node),
-                            Error(mut new_errors) => errors.append(&mut new_errors),
+                            Err(mut new_errors) => errors.append(&mut new_errors),
                         }
                     }
 
@@ -337,7 +512,7 @@ pub fn parse_node_recursive(expression: &SExpression) -> ParseResult
                     }
                     else
                     {
-                        return Error(errors);
+                        return Err(errors);
                     }
                 }
 
@@ -345,13 +520,13 @@ pub fn parse_node_recursive(expression: &SExpression) -> ParseResult
                 {
                     // Any square-bracketed lists aren't valid
                     errors.push(ParseError::InvalidSExpression(expression.clone()));
-                    return Error(errors);
+                    return Err(errors);
                 }
                 BracketType::None =>
                 {
                     // Any internally-generated lists aren't valid
                     errors.push(ParseError::InvalidSExpression(expression.clone()));
-                    return Error(errors);
+                    return Err(errors);
                 }
             }
         }
@@ -418,5 +593,70 @@ fn parse_primitive_operator(symbol: &String) -> Option<Node>
         ))),
 
         _ => None,
+    }
+}
+fn parse_type(expression: &SExpression) -> Result<Type, ParseErrorList>
+{
+    match expression
+    {
+        SExpression::Symbol(symbol) => match symbol.as_str()
+        {
+            symbols::primitive_data_types::INTEGER => Ok(Type::new(DataType::Integer)),
+            symbols::primitive_data_types::BOOLEAN => Ok(Type::new(DataType::Boolean)),
+            symbols::primitive_data_types::VOID => Ok(Type::new(DataType::Void)),
+            _ =>
+            {
+                let errors = vec![ParseError::InvalidType(expression.clone())];
+                return Err(errors);
+            }
+        },
+        SExpression::List(_bracket_type, _elements) =>
+        {
+            let errors = vec![ParseError::InvalidType(expression.clone())];
+            return Err(errors);
+        }
+    }
+}
+fn parse_arguments(expressions: &Vec<SExpression>) -> Result<Vec<ArgumentData>, ParseErrorList>
+{
+    let mut errors = ParseErrorList::new();
+    let mut arguments: Vec<ArgumentData> = Vec::new();
+
+    for expression in expressions.iter()
+    {
+        match expression
+        {
+            SExpression::List(BracketType::Square, elements) => match elements.as_slice()
+            {
+                [SExpression::Symbol(name), type_expression] => match parse_type(type_expression)
+                {
+                    Ok(argument_type) =>
+                    {
+                        arguments.push(ArgumentData::new(name.clone(), argument_type));
+                    }
+                    Err(mut new_errors) =>
+                    {
+                        errors.append(&mut new_errors);
+                    }
+                },
+                _ =>
+                {
+                    errors.push(ParseError::InvalidFunctionArgument(expression.clone()));
+                }
+            },
+            _ =>
+            {
+                errors.push(ParseError::InvalidFunctionArgument(expression.clone()));
+            }
+        }
+    }
+
+    if errors.is_empty()
+    {
+        return Ok(arguments);
+    }
+    else
+    {
+        return Err(errors);
     }
 }

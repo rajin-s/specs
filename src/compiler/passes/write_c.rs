@@ -3,10 +3,99 @@ use crate::language::symbols;
 
 pub fn apply(node: &Node) -> String
 {
-    return format!(
-        "#include \"specs_runtime.h\"\nint _USER_MAIN() \n{{\n{}\n}}",
-        get_c(node, 1)
-    );
+    let mut result = String::from("#include \"specs_runtime.h\"\n");
+
+    result.push_str("\n// Function Declarations\n");
+    node.parse_recursive(get_function_declarations, &mut result);
+    result.push_str("\n\n// Function Definitions\n");
+    node.parse_recursive(get_function_definitions, &mut result);
+    
+    result.push_str("\n\n// Program\n");
+    result = format!("{}\nint _USER_MAIN(){{ {}; }}", result, get_c(node, 1));
+    return result;
+}
+
+fn get_function_declarations(node: &Node, result: &mut String)
+{
+    match node
+    {
+        Node::Function(data) =>
+        {
+            let return_type_string = get_c_type(data.get_return_type());
+            let name_string = symbols::convert_to_c_safe(data.get_name());
+            let mut arguments_string = String::new();
+            for (i, argument) in data.get_arguments().iter().enumerate()
+            {
+                if i == 0
+                {
+                    arguments_string = format!(
+                        "{}{} {}",
+                        arguments_string,
+                        get_c_type(argument.get_type()),
+                        symbols::convert_to_c_safe(argument.get_name())
+                    );
+                }
+                else
+                {
+                    arguments_string = format!(
+                        "{}, {} {}",
+                        arguments_string,
+                        get_c_type(argument.get_type()),
+                        symbols::convert_to_c_safe(argument.get_name())
+                    );
+                }
+            }
+
+            *result = format!(
+                "{}\n{} {}({});",
+                result, return_type_string, name_string, arguments_string
+            );
+        }
+        _ =>
+        {}
+    }
+}
+fn get_function_definitions(node: &Node, result: &mut String)
+{
+    match node
+    {
+        Node::Function(data) =>
+        {
+            let return_type_string = get_c_type(data.get_return_type());
+            let name_string = symbols::convert_to_c_safe(data.get_name());
+            let mut arguments_string = String::new();
+            for (i, argument) in data.get_arguments().iter().enumerate()
+            {
+                if i == 0
+                {
+                    arguments_string = format!(
+                        "{}{} {}",
+                        arguments_string,
+                        get_c_type(argument.get_type()),
+                        symbols::convert_to_c_safe(argument.get_name())
+                    );
+                }
+                else
+                {
+                    arguments_string = format!(
+                        "{}, {} {}",
+                        arguments_string,
+                        get_c_type(argument.get_type()),
+                        symbols::convert_to_c_safe(argument.get_name())
+                    );
+                }
+            }
+
+            let body_string = get_c(data.get_body(), 0);
+
+            *result = format!(
+                "{}\n{} {}({}) {{ {}; }}",
+                result, return_type_string, name_string, arguments_string, body_string
+            );
+        }
+        _ =>
+        {}
+    }
 }
 
 fn get_c(node: &Node, indent: usize) -> String
@@ -51,6 +140,26 @@ fn get_c(node: &Node, indent: usize) -> String
                 .to_owned();
 
                 format!("({} {} {})", a_string, operator_string, b_string)
+            }
+            Node::Variable(operator_data) =>
+            {
+                let mut result =
+                    format!("{}(", symbols::convert_to_c_safe(operator_data.get_name()));
+                for (i, operand) in data.get_operands().iter().enumerate()
+                {
+                    let operand_string = get_c(operand, indent);
+                    if i == 0
+                    {
+                        result = format!("{}{}", result, operand_string);
+                    }
+                    else
+                    {
+                        result = format!("{}, {}", result, operand_string);
+                    }
+                }
+                result.push(')');
+
+                result
             }
             _ => format!("/* invalid operator node: {} */", node),
         },
@@ -113,7 +222,7 @@ fn get_c(node: &Node, indent: usize) -> String
             {
                 let else_string = get_c(data.get_else(), indent);
                 format!(
-                    "if ({}) {{{}}} else {{{}}}",
+                    "if ({}) {{{};}} else {{{};}}",
                     condition_string, then_string, else_string
                 )
             }
@@ -122,6 +231,8 @@ fn get_c(node: &Node, indent: usize) -> String
                 format!("if ({}) {{{}}}", condition_string, then_string)
             }
         }
+
+        Node::Function(data) => format!("/* function {} */", data.get_name()),
     }
 }
 
@@ -132,7 +243,7 @@ fn get_c_type(original_type: &Type) -> String
         DataType::Integer => format!("int"),
         DataType::Void => format!("void"),
         DataType::Boolean => format!("bool"),
-        _ => format!("???"),
+        _ => format!("?({})", original_type),
     };
 
     for _ in original_type.get_reference_layers().iter()

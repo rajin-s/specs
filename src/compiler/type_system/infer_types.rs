@@ -45,10 +45,58 @@ impl<'a> Params<'a>
 pub fn apply(root: &mut Node)
 {
     let mut symbols = SymbolTable::new();
+    {
+        symbols.insert(
+            "FOO".to_owned(),
+            Type::from(CallableTypeData::new(
+                vec![Type::new(DataType::Integer), Type::new(DataType::Integer)],
+                Type::new(DataType::Integer),
+            )),
+        );
+        symbols.insert(
+            "BAR".to_owned(),
+            Type::from(CallableTypeData::new(
+                vec![Type::new(DataType::Integer), Type::new(DataType::Integer)],
+                Type::new(DataType::Integer),
+            )),
+        );
+    }
     let mut top_level_symbols = LocalSymbolTable::new();
 
     let mut params = Params::new(&mut symbols, &mut top_level_symbols);
     infer_type(root, &mut params);
+}
+
+fn add_symbol(name: &String, symbol_type: &Type, params: &mut Params)
+{
+    // Add the binding type to the current symbol table
+    let (symbols, local_symbols) = params.get_mut();
+
+    let previous_entry = symbols.insert(name.clone(), symbol_type.clone());
+
+    // Save the original type of the symbol if needed
+    if !local_symbols.contains_key(name)
+    {
+        local_symbols.insert(name.clone(), previous_entry);
+    }
+}
+
+fn restore_symbol_table(symbols: &mut SymbolTable, new_local_symbols: LocalSymbolTable)
+{
+    // Restore symbol types to what they were before this scope
+    for (name, original_entry) in new_local_symbols
+    {
+        if let Some(original_type) = original_entry
+        {
+            // The symbol was previously bound to something
+            symbols.insert(name, original_type);
+        }
+        else
+        {
+            // The symbol was not previously bound to anything
+            symbols.remove(&name);
+        }
+    }
 }
 
 fn infer_type(node: &mut Node, params: &mut Params)
@@ -183,23 +231,15 @@ fn infer_type(node: &mut Node, params: &mut Params)
             // Infer the type of the binding
             data.recur_transformation(infer_type, params);
 
-            let name = data.get_name().clone();
-            let binding_type = data.get_binding().get_type().clone();
+            let name = data.get_name();
+            let binding_type = data.get_binding().get_type();
+
+            // Track the symbol type
+            add_symbol(name, binding_type, params);
 
             // Keep track of the binding type
-            // note: the binding might change during compilation
+            // note: the binding node might change during compilation
             data.set_binding_type(binding_type.clone());
-
-            // Add the binding type to the current symbol table
-            let (symbols, local_symbols) = params.get_mut();
-
-            let previous_entry = symbols.insert(name.clone(), binding_type);
-
-            // Save the original type of the symbol if needed
-            if !local_symbols.contains_key(&name)
-            {
-                local_symbols.insert(name.clone(), previous_entry);
-            }
         }
         Node::Assignment(_) =>
         {
@@ -210,6 +250,9 @@ fn infer_type(node: &mut Node, params: &mut Params)
         {
             if data.is_transparent()
             {
+                // Collect definitions from within the body of the sequence
+                collect_definition_types(data.get_nodes(), params);
+
                 // Transparent sequences don't introduce a new scope
                 // note: transparent sequences are only used internally,
                 //       so this doesn't matter for type-checking user programs
@@ -223,29 +266,57 @@ fn infer_type(node: &mut Node, params: &mut Params)
 
                 let mut new_params: Params = Params::new(symbols, &mut new_local_symbols);
 
+                // Collect definitions from within the body of the sequence
+                collect_definition_types(data.get_nodes(), &mut new_params);
+
                 // Infer the type of each child node
                 data.recur_transformation(infer_type, &mut new_params);
 
-                // Restore symbol types to what they were before this scope
-                for (name, original_entry) in new_local_symbols
-                {
-                    if let Some(original_type) = original_entry
-                    {
-                        // The symbol was previously bound to something
-                        symbols.insert(name, original_type);
-                    }
-                    else
-                    {
-                        // The symbol was not previously bound to anything
-                        symbols.remove(&name);
-                    }
-                }
+                // Restore the symbol table to what it was before the sequence
+                restore_symbol_table(symbols, new_local_symbols);
             }
         }
         Node::Conditional(data) =>
         {
             // Infer types in the condition and branches
             data.recur_transformation(infer_type, params);
+        }
+
+        Node::Function(data) =>
+        {
+            // Save original types if bindings shadow other bindings
+            let symbols = params.get_symbols_mut();
+            let mut new_local_symbols = LocalSymbolTable::new();
+
+            let mut new_params: Params = Params::new(symbols, &mut new_local_symbols);
+
+            // Bind argument types
+            for argument in data.get_arguments()
+            {
+                add_symbol(argument.get_name(), argument.get_type(), &mut new_params);
+            }
+
+            // Infer the type of the body
+            data.recur_transformation(infer_type, &mut new_params);
+
+            // Restore the symbol table to what it was before the function
+            restore_symbol_table(symbols, new_local_symbols);
+        }
+    }
+}
+
+fn collect_definition_types(nodes: &Vec<Node>, params: &mut Params)
+{
+    for node in nodes.iter()
+    {
+        match node
+        {
+            Node::Function(data) =>
+            {
+                add_symbol(data.get_name(), data.get_type(), params);
+            }
+            _ =>
+            {}
         }
     }
 }

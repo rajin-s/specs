@@ -1,78 +1,304 @@
 Source Text:
-	let a = true
-	let b = false
+	<<< Top-Level Definitions
+	    (order independent) >>>
 	
-	let c = 100 < 200
-	let d = a == b
-	let e = c =/= d
-	
-	if a and c and d and (e == d) then
+	fn Add-10 [x int] -> int
 	{
-	    a
+	    x + 10
 	}
 	
-	let q = (a == (1 =/= 2))
+	let x = (Add-10 1)
+	let y = (Add-10 3)
+	let z = (Add-10 (Add-10 4))
+	
+	fn Is-Even [x int] -> bool
+	{
+	    if x == 0 then true
+	    else if x < 0 then false
+	    else (Is-Even x + -2)
+	}
+	
+	let seven-is-even = (Is-Even 7)
+	
+	fn Is-Seven [x int] -> bool
+	{
+	    # 6 and 8 are definitely not seven, so we have an early out
+	    if x == 6 then
+	    {
+	        false
+	    }
+	    else if x == 8 then
+	    {
+	        false
+	    }
+	    else if (Is-Even x) then
+	    {
+	        false
+	    }
+	    else
+	    {
+	        2 == x + -5
+	    }
+	}
+	
+	let seven-is-seven = (Is-Seven 7)
+	let foo = (Is-Seven (Add-10 -3))
+	
+	fn Add [a int] [b int] -> int
+	{
+	    a + b
+	}
+	
+	(Add-10 (Add 5 1))
+	
+	fn Foo -> int
+	{
+	    1 + z
+	}
+	
+	<<< Inner Definitions
+	    (order independent within scope) >>>
+	
+	<<<
+	
+	fn Factorial [n int] -> int
+	{
+	    (Accumulator n 0)
+	
+	    fn Accumulator [n int] [acc int] -> int
+	    {
+	        if n <= 1 then a
+	        else (Accumulator (n + -1) (Multiply n acc 0))
+	    }
+	
+	    fn Multiply [a int] [b int] [acc int] -> int
+	    {
+	        if b == 0 then acc
+	        else (Multiply a (b + -1) (b + acc))
+	    }
+	}
+	
+	if (Is-Even 5) then
+	{
+	    (Add-100 (Get-100))
+	
+	    fn Add-100 [x int] -> int { x + 100 }
+	    fn Get-100 -> int { 100 }
+	}
+	else
+	{
+	    fn Add-100 [x int] -> int { x + 50 + 50 }
+	    fn Get-100 -> int { (Add-100 0) }
+	
+	    (Add-100 (Get-100))
+	}
+	
+	<<< Function pointers
+	    (no closures yet!) >>>
+	
+	fn Add-5 [x int] -> int { x + 5 }
+	
+	fn Get-Function [x int] -> (int -> int)
+	{
+	    fn Add-1   [x int] -> int { x + 1 }
+	    fn Add-10  [x int] -> int { x + 10 }
+	    fn Add-100 [x int] -> int { x + 100 }
+	
+	    if x == 0 then
+	    {
+	        Add-100
+	    }
+	    else if x == 10 then
+	    {
+	        Add-10
+	    }
+	    else if x == 5 then
+	    {
+	        Add-5
+	    }
+	    else
+	    {
+	        Add-1
+	    }
+	}
+	
+	let f = (Get-Function 0)
+	(f 100)
+	(f 10)
+	(f 5)
+	(f 0)
+	
+	fn Apply
+	    [f (int -> int)]
+	    [x  int]
+	    -> int
+	{
+	    (f x)
+	}
+	
+	(Apply f 1)
+	(Apply (Get-Function 777) 1)
+	
+	<<< Anonymous Functions >>>
+	
+	(
+	    fn [x int] -> int { x + 50 }
+	    100
+	)
+	
+	fn Get-Function-2 [x int] -> (int -> int)
+	{
+	    if x == 0
+	    {
+	        fn [a int] [b int] -> int { a + b }
+	    }
+	    else
+	    {
+	        fn [a int] [b int] -> int { a + a + b + b }
+	    }
+	}
+	
+	((Get-Function-2 1) 2 3)
+	
+	let g = (Get-Function-2 0)
+	(g 100 101)
+	
+	>>>
 
 S-Expression Result:
-	<let a = true let b = false let c = 100 < 200 let d = a == b let e = c =/= d if a and c and d and (e == d) then {a} let q = (a == (1 =/= 2))>
+	<fn Add-10 [x int] -> int {x + 10} let x = (Add-10 1) let y = (Add-10 3) let z = (Add-10 (Add-10 4)) fn Is-Even [x int] -> bool {if x == 0 then true else if x < 0 then false else (Is-Even x + -2)} let seven-is-even = (Is-Even 7) fn Is-Seven [x int] -> bool {if x == 6 then {false} else if x == 8 then {false} else if (Is-Even x) then {false} else {2 == x + -5}} let seven-is-seven = (Is-Seven 7) let foo = (Is-Seven (Add-10 -3)) fn Add [a int] [b int] -> int {a + b} (Add-10 (Add 5 1)) fn Foo -> int {1 + z}>
 
 Preprocessor Result:
-	<(let a = true) (let b = false) (let c = (100 < 200)) (let d = (a == b)) (let e = (c =/= d)) (if (((a and c) and d) and (e == d)) then {a}) (let q = (a == (1 =/= 2)))>
+	<(fn Add-10 <[x int]> -> int {(x + 10)}) (let x = (Add-10 1)) (let y = (Add-10 3)) (let z = (Add-10 (Add-10 4))) (fn Is-Even <[x int]> -> bool {(if (x == 0) then true else (if (x < 0) then false else (Is-Even (x + -2))))}) (let seven-is-even = (Is-Even 7)) (fn Is-Seven <[x int]> -> bool {(if (x == 6) then {false} else (if (x == 8) then {false} else (if (Is-Even x) then {false} else {(2 == (x + -5))})))}) (let seven-is-seven = (Is-Seven 7)) (let foo = (Is-Seven (Add-10 -3))) (fn Add <[a int] [b int]> -> int {(a + b)}) (Add-10 (Add 5 1)) (fn Foo -> int {(1 + z)})>
 
 Parse Result:
-	{(let a = [bool true]) (let b = [bool false]) (let c = (< [int 100] [int 200])) (let d = (== [var a] [var b])) (let e = (=/= [var c] [var d])) (if (and (and (and [var a] [var c]) [var d]) (== [var e] [var d])) then {[var a]}) (let q = (== [var a] (=/= [int 1] [int 2])))}
+	{<fn Add-10 [x Int] -> Int {(+ [var x] [int 10])}> (let x = ([var Add-10] [int 1])) (let y = ([var Add-10] [int 3])) (let z = ([var Add-10] ([var Add-10] [int 4]))) <fn Is-Even [x Int] -> Bool {(if (== [var x] [int 0]) then [bool true] else (if (< [var x] [int 0]) then [bool false] else ([var Is-Even] (+ [var x] [int -2]))))}> (let seven-is-even = ([var Is-Even] [int 7])) <fn Is-Seven [x Int] -> Bool {(if (== [var x] [int 6]) then {[bool false]} else (if (== [var x] [int 8]) then {[bool false]} else (if ([var Is-Even] [var x]) then {[bool false]} else {(== [int 2] (+ [var x] [int -5]))})))}> (let seven-is-seven = ([var Is-Seven] [int 7])) (let foo = ([var Is-Seven] ([var Add-10] [int -3]))) <fn Add [a Int] [b Int] -> Int {(+ [var a] [var b])}> ([var Add-10] ([var Add] [int 5] [int 1])) <fn Foo -> Int {(+ [int 1] [var z])}>}
 
 Types:
-	Void     : {(let a = [bool true]) (let b = [bool false]) (let c = (< [int 100] [int 200])) (let d = (== [var a] [var b])) (let e = (=/= [var c] [var d])) (if (and (and (and [var a] [var c]) [var d]) (== [var e] [var d])) then {[var a]}) (let q = (== [var a] (=/= [int 1] [int 2])))}
-	Void     : (let a = [bool true])
-	Bool     : [bool true]
-	Void     : (let b = [bool false])
-	Bool     : [bool false]
-	Void     : (let c = (< [int 100] [int 200]))
-	Bool     : (< [int 100] [int 200])
-	(Int Int -> Bool) : <
-	Int      : [int 100]
-	Int      : [int 200]
-	Void     : (let d = (== [var a] [var b]))
-	Bool     : (== [var a] [var b])
-	(Bool Bool -> Bool) : ==
-	Bool     : [var a]
-	Bool     : [var b]
-	Void     : (let e = (=/= [var c] [var d]))
-	Bool     : (=/= [var c] [var d])
-	(Bool Bool -> Bool) : =/=
-	Bool     : [var c]
-	Bool     : [var d]
-	Bool     : (if (and (and (and [var a] [var c]) [var d]) (== [var e] [var d])) then {[var a]})
-	Bool     : (and (and (and [var a] [var c]) [var d]) (== [var e] [var d]))
-	(Bool Bool -> Bool) : and
-	Bool     : (and (and [var a] [var c]) [var d])
-	(Bool Bool -> Bool) : and
-	Bool     : (and [var a] [var c])
-	(Bool Bool -> Bool) : and
-	Bool     : [var a]
-	Bool     : [var c]
-	Bool     : [var d]
-	Bool     : (== [var e] [var d])
-	(Bool Bool -> Bool) : ==
-	Bool     : [var e]
-	Bool     : [var d]
-	Bool     : {[var a]}
-	Bool     : [var a]
-	Void     : nothing
-	Void     : (let q = (== [var a] (=/= [int 1] [int 2])))
-	Bool     : (== [var a] (=/= [int 1] [int 2]))
-	(Bool Bool -> Bool) : ==
-	Bool     : [var a]
-	Bool     : (=/= [int 1] [int 2])
-	(Int Int -> Bool) : =/=
+	(-> Int) : {<fn Add-10 [x Int] -> Int {(+ [var x] [int 10])}> (let x = ([var Add-10] [int 1])) (let y = ([var Add-10] [int 3])) (let z = ([var Add-10] ([var Add-10] [int 4]))) <fn Is-Even [x Int] -> Bool {(if (== [var x] [int 0]) then [bool true] else (if (< [var x] [int 0]) then [bool false] else ([var Is-Even] (+ [var x] [int -2]))))}> (let seven-is-even = ([var Is-Even] [int 7])) <fn Is-Seven [x Int] -> Bool {(if (== [var x] [int 6]) then {[bool false]} else (if (== [var x] [int 8]) then {[bool false]} else (if ([var Is-Even] [var x]) then {[bool false]} else {(== [int 2] (+ [var x] [int -5]))})))}> (let seven-is-seven = ([var Is-Seven] [int 7])) (let foo = ([var Is-Seven] ([var Add-10] [int -3]))) <fn Add [a Int] [b Int] -> Int {(+ [var a] [var b])}> ([var Add-10] ([var Add] [int 5] [int 1])) <fn Foo -> Int {(+ [int 1] [var z])}>}
+	(Int -> Int) : <fn Add-10 [x Int] -> Int {(+ [var x] [int 10])}>
+	Int      : {(+ [var x] [int 10])}
+	Int      : (+ [var x] [int 10])
+	(Int Int -> Int) : +
+	Int      : [var x]
+	Int      : [int 10]
+	Void     : (let x = ([var Add-10] [int 1]))
+	Int      : ([var Add-10] [int 1])
+	(Int -> Int) : [var Add-10]
 	Int      : [int 1]
+	Void     : (let y = ([var Add-10] [int 3]))
+	Int      : ([var Add-10] [int 3])
+	(Int -> Int) : [var Add-10]
+	Int      : [int 3]
+	Void     : (let z = ([var Add-10] ([var Add-10] [int 4])))
+	Int      : ([var Add-10] ([var Add-10] [int 4]))
+	(Int -> Int) : [var Add-10]
+	Int      : ([var Add-10] [int 4])
+	(Int -> Int) : [var Add-10]
+	Int      : [int 4]
+	(Int -> Bool) : <fn Is-Even [x Int] -> Bool {(if (== [var x] [int 0]) then [bool true] else (if (< [var x] [int 0]) then [bool false] else ([var Is-Even] (+ [var x] [int -2]))))}>
+	Bool     : {(if (== [var x] [int 0]) then [bool true] else (if (< [var x] [int 0]) then [bool false] else ([var Is-Even] (+ [var x] [int -2]))))}
+	Bool     : (if (== [var x] [int 0]) then [bool true] else (if (< [var x] [int 0]) then [bool false] else ([var Is-Even] (+ [var x] [int -2]))))
+	Bool     : (== [var x] [int 0])
+	(Int Int -> Bool) : ==
+	Int      : [var x]
+	Int      : [int 0]
+	Bool     : [bool true]
+	Bool     : (if (< [var x] [int 0]) then [bool false] else ([var Is-Even] (+ [var x] [int -2])))
+	Bool     : (< [var x] [int 0])
+	(Int Int -> Bool) : <
+	Int      : [var x]
+	Int      : [int 0]
+	Bool     : [bool false]
+	Bool     : ([var Is-Even] (+ [var x] [int -2]))
+	(Int -> Bool) : [var Is-Even]
+	Int      : (+ [var x] [int -2])
+	(Int Int -> Int) : +
+	Int      : [var x]
+	Int      : [int -2]
+	Void     : (let seven-is-even = ([var Is-Even] [int 7]))
+	Bool     : ([var Is-Even] [int 7])
+	(Int -> Bool) : [var Is-Even]
+	Int      : [int 7]
+	(Int -> Bool) : <fn Is-Seven [x Int] -> Bool {(if (== [var x] [int 6]) then {[bool false]} else (if (== [var x] [int 8]) then {[bool false]} else (if ([var Is-Even] [var x]) then {[bool false]} else {(== [int 2] (+ [var x] [int -5]))})))}>
+	Bool     : {(if (== [var x] [int 6]) then {[bool false]} else (if (== [var x] [int 8]) then {[bool false]} else (if ([var Is-Even] [var x]) then {[bool false]} else {(== [int 2] (+ [var x] [int -5]))})))}
+	Bool     : (if (== [var x] [int 6]) then {[bool false]} else (if (== [var x] [int 8]) then {[bool false]} else (if ([var Is-Even] [var x]) then {[bool false]} else {(== [int 2] (+ [var x] [int -5]))})))
+	Bool     : (== [var x] [int 6])
+	(Int Int -> Bool) : ==
+	Int      : [var x]
+	Int      : [int 6]
+	Bool     : {[bool false]}
+	Bool     : [bool false]
+	Bool     : (if (== [var x] [int 8]) then {[bool false]} else (if ([var Is-Even] [var x]) then {[bool false]} else {(== [int 2] (+ [var x] [int -5]))}))
+	Bool     : (== [var x] [int 8])
+	(Int Int -> Bool) : ==
+	Int      : [var x]
+	Int      : [int 8]
+	Bool     : {[bool false]}
+	Bool     : [bool false]
+	Bool     : (if ([var Is-Even] [var x]) then {[bool false]} else {(== [int 2] (+ [var x] [int -5]))})
+	Bool     : ([var Is-Even] [var x])
+	(Int -> Bool) : [var Is-Even]
+	Int      : [var x]
+	Bool     : {[bool false]}
+	Bool     : [bool false]
+	Bool     : {(== [int 2] (+ [var x] [int -5]))}
+	Bool     : (== [int 2] (+ [var x] [int -5]))
+	(Int Int -> Bool) : ==
 	Int      : [int 2]
+	Int      : (+ [var x] [int -5])
+	(Int Int -> Int) : +
+	Int      : [var x]
+	Int      : [int -5]
+	Void     : (let seven-is-seven = ([var Is-Seven] [int 7]))
+	Bool     : ([var Is-Seven] [int 7])
+	(Int -> Bool) : [var Is-Seven]
+	Int      : [int 7]
+	Void     : (let foo = ([var Is-Seven] ([var Add-10] [int -3])))
+	Bool     : ([var Is-Seven] ([var Add-10] [int -3]))
+	(Int -> Bool) : [var Is-Seven]
+	Int      : ([var Add-10] [int -3])
+	(Int -> Int) : [var Add-10]
+	Int      : [int -3]
+	(Int Int -> Int) : <fn Add [a Int] [b Int] -> Int {(+ [var a] [var b])}>
+	Int      : {(+ [var a] [var b])}
+	Int      : (+ [var a] [var b])
+	(Int Int -> Int) : +
+	Int      : [var a]
+	Int      : [var b]
+	Int      : ([var Add-10] ([var Add] [int 5] [int 1]))
+	(Int -> Int) : [var Add-10]
+	Int      : ([var Add] [int 5] [int 1])
+	(Int Int -> Int) : [var Add]
+	Int      : [int 5]
+	Int      : [int 1]
+	(-> Int) : <fn Foo -> Int {(+ [int 1] [var z])}>
+	Int      : {(+ [int 1] [var z])}
+	Int      : (+ [int 1] [var z])
+	(Int Int -> Int) : +
+	Int      : [int 1]
+	Int      : [var z]
 
 C output:
 
 #include "specs_runtime.h"
-int _USER_MAIN() 
-{
-{ bool a = true;bool b = false;bool c = (100 < 200);bool d = (a == b);bool e = (c != d);if ((((a && c) && d) && (e == d))) {{ a; }};bool q = (a == (1 != 2)); }
-}
+
+// Function Declarations
+
+int Add__10(int x);
+bool Is__Even(int x);
+bool Is__Seven(int x);
+int Add(int a, int b);
+int Foo();
+
+// Function Definitions
+
+int Add__10(int x) { return((x + 10)); }
+bool Is__Even(int x) { if ((x == 0)) {return(true);} else {if ((x < 0)) {return(false);} else {return(Is__Even((x + -2)));};}; }
+bool Is__Seven(int x) { if ((x == 6)) {return(false);} else {if ((x == 8)) {return(false);} else {if (Is__Even(x)) {return(false);} else {return((2 == (x + -5)));};};}; }
+int Add(int a, int b) { return((a + b)); }
+int Foo() { return((1 + z)); }
+
+// Program
+
+int _USER_MAIN(){ { /* function Add-10 */;int x = Add__10(1);int y = Add__10(3);int z = Add__10(Add__10(4));/* function Is-Even */;bool seven__is__even = Is__Even(7);/* function Is-Seven */;bool seven__is__seven = Is__Seven(7);bool foo = Is__Seven(Add__10(-3));/* function Add */;return(Add__10(Add(5, 1)));/* function Foo */; }; }

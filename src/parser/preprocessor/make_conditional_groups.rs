@@ -42,15 +42,19 @@ fn group_conditionals(source_bracket_type: BracketType, elements: &mut Vec<SExpr
     if elements.len() > IF_THEN_SIZE || (elements.len() == IF_THEN_SIZE && !same_bracket)
     {
         let max_if_then_slice_start = elements.len() - (IF_THEN_SIZE - 1);
-        let max_if_else_slice_start = elements.len() - (IF_ELSE_SIZE - 1);
+        let max_if_else_slice_start = if elements.len() >= IF_ELSE_SIZE
+        {
+            elements.len() - (IF_ELSE_SIZE - 1)
+        }
+        else
+        {
+            0
+        };
 
         let element_count = elements.len();
         let elements_slice = elements.as_mut_slice();
-
         let mut empty_count = 0;
-
         let mut skip_count = 0;
-
         // note: make groups in *reverse* order so else-if branched are handled correctly
         // ex. if A then B else if C then D else E
         //  => (if A then B else (if C then D else E))
@@ -62,7 +66,6 @@ fn group_conditionals(source_bracket_type: BracketType, elements: &mut Vec<SExpr
                 skip_count -= 1;
                 continue;
             }
-
             if i < max_if_else_slice_start
             {
                 let slice = &mut elements_slice[i..i + IF_ELSE_SIZE];

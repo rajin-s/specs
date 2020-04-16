@@ -1,0 +1,31 @@
+functions.c:14:31: warning: equality comparison with extraneous parentheses [-Wparentheses-equality]
+bool Is__Even(int x) { if ((x == 0)) {return(true);} else {if ((x < 0)) {return(false);} else {return(Is__Even((x + -2)));};}; }
+                            ~~^~~~
+functions.c:14:31: note: remove extraneous parentheses around the comparison to silence this warning
+bool Is__Even(int x) { if ((x == 0)) {return(true);} else {if ((x < 0)) {return(false);} else {return(Is__Even((x + -2)));};}; }
+                           ~  ^   ~
+functions.c:14:31: note: use '=' to turn this equality comparison into an assignment
+bool Is__Even(int x) { if ((x == 0)) {return(true);} else {if ((x < 0)) {return(false);} else {return(Is__Even((x + -2)));};}; }
+                              ^~
+                              =
+functions.c:15:32: warning: equality comparison with extraneous parentheses [-Wparentheses-equality]
+bool Is__Seven(int x) { if ((x == 6)) {return(false);} else {if ((x == 8)) {return(false);} else {if (Is__Even(x)) {return(false);} else {return((2 == (x + -5)));};};}; }
+                             ~~^~~~
+functions.c:15:32: note: remove extraneous parentheses around the comparison to silence this warning
+bool Is__Seven(int x) { if ((x == 6)) {return(false);} else {if ((x == 8)) {return(false);} else {if (Is__Even(x)) {return(false);} else {return((2 == (x + -5)));};};}; }
+                            ~  ^   ~
+functions.c:15:32: note: use '=' to turn this equality comparison into an assignment
+bool Is__Seven(int x) { if ((x == 6)) {return(false);} else {if ((x == 8)) {return(false);} else {if (Is__Even(x)) {return(false);} else {return((2 == (x + -5)));};};}; }
+                               ^~
+                               =
+functions.c:15:69: warning: equality comparison with extraneous parentheses [-Wparentheses-equality]
+bool Is__Seven(int x) { if ((x == 6)) {return(false);} else {if ((x == 8)) {return(false);} else {if (Is__Even(x)) {return(false);} else {return((2 == (x + -5)));};};}; }
+                                                                  ~~^~~~
+functions.c:15:69: note: remove extraneous parentheses around the comparison to silence this warning
+bool Is__Seven(int x) { if ((x == 6)) {return(false);} else {if ((x == 8)) {return(false);} else {if (Is__Even(x)) {return(false);} else {return((2 == (x + -5)));};};}; }
+                                                                 ~  ^   ~
+functions.c:15:69: note: use '=' to turn this equality comparison into an assignment
+bool Is__Seven(int x) { if ((x == 6)) {return(false);} else {if ((x == 8)) {return(false);} else {if (Is__Even(x)) {return(false);} else {return((2 == (x + -5)));};};}; }
+                                                                    ^~
+                                                                    =
+3 warnings generated.

@@ -4,6 +4,7 @@ pub use super::types::*;
 use std::boxed::Box;
 type OtherNode = Box<Node>;
 
+#[derive(Clone)]
 pub enum Node
 {
     Nothing,
@@ -22,6 +23,8 @@ pub enum Node
 
     Sequence(SequenceNodeData),
     Conditional(ConditionalNodeData),
+
+    Function(FunctionNodeData),
 }
 impl Node
 {
@@ -29,6 +32,20 @@ impl Node
     {
         return value.to_node();
     }
+
+    pub fn is_atomic(&self) -> bool
+    {
+        match self
+        {
+            Node::Nothing
+            | Node::Integer(_)
+            | Node::Boolean(_)
+            | Node::Variable(_)
+            | Node::PrimitiveOperator(_) => true,
+            _ => false,
+        }
+    }
+
     pub fn parse_recursive<TParams>(&self, function: fn(&Node, &mut TParams), params: &mut TParams)
     {
         use Node::*;
@@ -83,6 +100,11 @@ impl Node
                 data.get_then().parse_recursive(function, params);
                 data.get_else().parse_recursive(function, params);
             }
+
+            Function(data) =>
+            {
+                data.get_body().parse_recursive(function, params);
+            }
         }
     }
 }
@@ -108,6 +130,8 @@ impl Typed for Node
 
             Node::Sequence(data) => data.get_type(),
             Node::Conditional(data) => data.get_type(),
+
+            Node::Function(data) => data.get_type(),
         }
     }
 }
@@ -149,6 +173,8 @@ impl NodeRecur for Node
 
             Node::Sequence(data) => data.recur_transformation(function, params),
             Node::Conditional(data) => data.recur_transformation(function, params),
+
+            Node::Function(data) => data.recur_transformation(function, params),
         }
     }
 }
@@ -196,6 +222,7 @@ macro_rules! impl_to_node {
 /*                                Atomic Nodes                                */
 /* -------------------------------------------------------------------------- */
 
+#[derive(Clone)]
 pub struct IntegerNodeData
 {
     value: i64,
@@ -222,6 +249,7 @@ impl Typed for IntegerNodeData
 }
 impl_to_node!(IntegerNodeData, Node::Integer);
 
+#[derive(Clone)]
 pub struct BooleanNodeData
 {
     value: bool,
@@ -248,6 +276,7 @@ impl Typed for BooleanNodeData
 }
 impl_to_node!(BooleanNodeData, Node::Boolean);
 
+#[derive(Clone)]
 pub struct VariableNodeData
 {
     name:      String,
@@ -282,6 +311,7 @@ impl_to_node!(VariableNodeData, Node::Variable);
 /*                                  Functions                                 */
 /* -------------------------------------------------------------------------- */
 
+#[derive(Clone)]
 pub struct CallNodeData
 {
     operator: OtherNode,
@@ -344,6 +374,7 @@ impl NodeRecur for CallNodeData
 impl_typed!(CallNodeData);
 impl_to_node!(CallNodeData, Node::Call);
 
+#[derive(Clone)]
 pub struct PrimitiveOperatorNodeData
 {
     node_type: Type,
@@ -371,6 +402,7 @@ impl_to_node!(PrimitiveOperatorNodeData, Node::PrimitiveOperator);
 /*                               Reference Nodes                              */
 /* -------------------------------------------------------------------------- */
 
+#[derive(Clone)]
 pub struct ReferenceNodeData
 {
     reference_type: Reference,
@@ -402,6 +434,14 @@ impl ReferenceNodeData
             node_type:      Type::unknown(),
         };
     }
+    pub fn new_infer_type(target_node: Node, reference_type: Reference) -> Self
+    {
+        return Self {
+            node_type:      target_node.get_type().make_reference(reference_type),
+            target_node:    OtherNode::new(target_node),
+            reference_type: reference_type,
+        };
+    }
 }
 impl NodeRecur for ReferenceNodeData
 {
@@ -417,6 +457,7 @@ impl NodeRecur for ReferenceNodeData
 impl_typed!(ReferenceNodeData);
 impl_to_node!(ReferenceNodeData, Node::Reference);
 
+#[derive(Clone)]
 pub struct DereferenceNodeData
 {
     target_node: OtherNode,
@@ -459,6 +500,7 @@ impl_to_node!(DereferenceNodeData, Node::Dereference);
 /*                              Structural Nodes                              */
 /* -------------------------------------------------------------------------- */
 
+#[derive(Clone)]
 pub struct BindingNodeData
 {
     name:         String,
@@ -520,6 +562,7 @@ impl NodeRecur for BindingNodeData
 }
 impl_to_node!(BindingNodeData, Node::Binding);
 
+#[derive(Clone)]
 pub struct AssignmentNodeData
 {
     lhs: OtherNode,
@@ -566,6 +609,7 @@ impl NodeRecur for AssignmentNodeData
 }
 impl_to_node!(AssignmentNodeData, Node::Assignment);
 
+#[derive(Clone)]
 pub struct SequenceNodeData
 {
     nodes:          Vec<Node>,
@@ -642,6 +686,7 @@ impl Typed for SequenceNodeData
 }
 impl_to_node!(SequenceNodeData, Node::Sequence);
 
+#[derive(Clone)]
 pub struct ConditionalNodeData
 {
     condition_node: OtherNode,
@@ -716,3 +761,103 @@ impl Typed for ConditionalNodeData
     }
 }
 impl_to_node!(ConditionalNodeData, Node::Conditional);
+
+/* -------------------------------------------------------------------------- */
+/*                              Definition Nodes                              */
+/* -------------------------------------------------------------------------- */
+
+#[derive(Clone)]
+pub struct ArgumentData
+{
+    name:          String,
+    argument_type: Type,
+}
+impl ArgumentData
+{
+    pub fn get_name(&self) -> &String
+    {
+        return &self.name;
+    }
+    pub fn get_type(&self) -> &Type
+    {
+        return &self.argument_type;
+    }
+
+    pub fn new(name: String, argument_type: Type) -> Self
+    {
+        return Self {
+            name:          name,
+            argument_type: argument_type,
+        };
+    }
+}
+
+#[derive(Clone)]
+pub struct FunctionNodeData
+{
+    name:      String,
+    arguments: Vec<ArgumentData>,
+    body_node: OtherNode,
+
+    return_type: Type,
+    node_type:   Type,
+}
+impl FunctionNodeData
+{
+    pub fn get_name(&self) -> &String
+    {
+        return &self.name;
+    }
+    pub fn get_arguments(&self) -> &Vec<ArgumentData>
+    {
+        return &self.arguments;
+    }
+    pub fn get_return_type(&self) -> &Type
+    {
+        return &self.return_type;
+    }
+
+    pub fn get_body(&self) -> &Node
+    {
+        return self.body_node.as_ref();
+    }
+    pub fn get_body_mut(&mut self) -> &mut Node
+    {
+        return self.body_node.as_mut();
+    }
+
+    pub fn new(name: String, arguments: Vec<ArgumentData>, return_type: Type, body: Node) -> Self
+    {
+        let mut argument_types = Vec::new();
+        for argument in arguments.iter()
+        {
+            argument_types.push(argument.get_type().clone());
+        }
+        let function_type = Type::from(CallableTypeData::new(argument_types, return_type.clone()));
+
+        return Self {
+            name:        name,
+            arguments:   arguments,
+            body_node:   OtherNode::new(body),
+            node_type:   function_type,
+            return_type: return_type,
+        };
+    }
+    pub fn new_infer_type(name: String, arguments: Vec<ArgumentData>, body: Node) -> Self
+    {
+        return FunctionNodeData::new(name, arguments, body.get_type().clone(), body);
+    }
+}
+impl NodeRecur for FunctionNodeData
+{
+    fn recur_transformation<TParams>(
+        &mut self,
+        function: fn(&mut Node, &mut TParams),
+        params: &mut TParams,
+    )
+    {
+        function(self.get_body_mut(), params);
+    }
+}
+impl_typed!(FunctionNodeData);
+impl_to_node!(FunctionNodeData, Node::Function);

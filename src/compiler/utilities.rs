@@ -1,11 +1,11 @@
 use crate::language::nodes::*;
 
-pub struct TempName
+pub struct TempNameGenerator
 {
     name:   String,
     number: usize,
 }
-impl TempName
+impl TempNameGenerator
 {
     pub fn new(name: &str) -> Self
     {

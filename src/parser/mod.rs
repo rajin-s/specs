@@ -10,11 +10,7 @@ mod parse_node;
 
 use crate::language::nodes::*;
 
-pub enum ParseResult
-{
-    Ok(Node),
-    Error(ParseErrorList),
-}
+pub type ParseResult = Result<Node, ParseErrorList>;
 
 pub struct Parser {}
 impl Parser
@@ -28,6 +24,7 @@ impl Parser
     // Preprocess an S-Expression for parsing
     pub fn preprocess(&self, source: &mut SExpression)
     {
+        preprocessor::make_function_groups::apply(source);
         preprocessor::make_operator_groups::apply(source);
         preprocessor::make_conditional_groups::apply(source);
         preprocessor::make_assign_groups::apply(source);
@@ -47,18 +44,18 @@ impl Parser
             {
                 match parse_node::parse_node_recursive(element)
                 {
-                    ParseResult::Ok(node) => nodes.push(node),
-                    ParseResult::Error(mut new_errors) => errors.append(&mut new_errors),
+                    Ok(node) => nodes.push(node),
+                    Err(mut new_errors) => errors.append(&mut new_errors),
                 }
             }
 
             if errors.len() == 0
             {
-                return ParseResult::Ok(SequenceNodeData::new(nodes).to_node());
+                return Ok(SequenceNodeData::new(nodes).to_node());
             }
             else
             {
-                return ParseResult::Error(errors);
+                return Err(errors);
             }
         }
         else
@@ -66,7 +63,7 @@ impl Parser
             errors.push(ParseError::Internal(String::from(
                 "Invalid top-level SExpression",
             )));
-            return ParseResult::Error(errors);
+            return Err(errors);
         }
     }
 

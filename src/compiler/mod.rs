@@ -64,7 +64,11 @@ impl Compiler
         }
         // Do passes
 
-        // extract_sequences::apply(&mut self.root_node);
+        remove_single_sequences::apply(&mut self.root_node);
+        extract_conditionals::apply(&mut self.root_node);
+        extract_sequences::apply(&mut self.root_node);
+
+        insert_returns::apply(&mut self.root_node);
 
         // Generate output
         let output = write_c::apply(&self.root_node);

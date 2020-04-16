@@ -50,7 +50,7 @@ fn main()
 
             match parser.parse(&s_expression)
             {
-                ParseResult::Ok(mut node) =>
+                Ok(node) =>
                 {
                     println!("Parse Result:");
                     println!("\t{}\n", &node);
@@ -70,25 +70,11 @@ fn main()
                         fs::write(input_path.replace(".sp", ".c"), c_string);
                     }
                 }
-                ParseResult::Error(errors) =>
+                Err(errors) =>
                 {
                     for error in errors.iter()
                     {
-                        match error
-                        {
-                            ParseError::Internal(message) =>
-                            {
-                                println!("Parse error (internal): {}", message)
-                            }
-                            ParseError::InvalidSExpression(expression) =>
-                            {
-                                println!("Parse error (invalid S-Expression): {}", expression)
-                            }
-                            ParseError::InvalidSymbol(symbol) =>
-                            {
-                                println!("Parse error (invalid symbol): '{}'", symbol)
-                            }
-                        }
+                        println!("Parse error: {}", error);
                     }
                 }
             }
