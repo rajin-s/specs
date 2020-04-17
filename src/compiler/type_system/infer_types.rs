@@ -1,105 +1,13 @@
 use crate::language::nodes::*;
 use std::collections::HashMap;
 
-type SymbolTable = HashMap<String, Type>;
-type LocalSymbolTable = HashMap<String, Option<Type>>;
-
-struct Params<'a>
-{
-    symbols:       &'a mut SymbolTable,
-    local_symbols: &'a mut LocalSymbolTable,
-}
-impl<'a> Params<'a>
-{
-    pub fn new(symbols: &'a mut SymbolTable, local_symbols: &'a mut LocalSymbolTable) -> Self
-    {
-        return Self {
-            symbols:       symbols,
-            local_symbols: local_symbols,
-        };
-    }
-
-    pub fn get_symbols(&self) -> &SymbolTable
-    {
-        return self.symbols;
-    }
-    pub fn get_local_symbols(&self) -> &LocalSymbolTable
-    {
-        return self.local_symbols;
-    }
-
-    pub fn get_symbols_mut(&mut self) -> &mut SymbolTable
-    {
-        return self.symbols;
-    }
-    pub fn get_local_symbols_mut(&mut self) -> &mut LocalSymbolTable
-    {
-        return self.local_symbols;
-    }
-    pub fn get_mut(&mut self) -> (&mut SymbolTable, &mut LocalSymbolTable)
-    {
-        return (self.symbols, self.local_symbols);
-    }
-}
-
 pub fn apply(root: &mut Node)
 {
-    let mut symbols = SymbolTable::new();
-    {
-        symbols.insert(
-            "FOO".to_owned(),
-            Type::from(CallableTypeData::new(
-                vec![Type::new(DataType::Integer), Type::new(DataType::Integer)],
-                Type::new(DataType::Integer),
-            )),
-        );
-        symbols.insert(
-            "BAR".to_owned(),
-            Type::from(CallableTypeData::new(
-                vec![Type::new(DataType::Integer), Type::new(DataType::Integer)],
-                Type::new(DataType::Integer),
-            )),
-        );
-    }
-    let mut top_level_symbols = LocalSymbolTable::new();
-
-    let mut params = Params::new(&mut symbols, &mut top_level_symbols);
-    infer_type(root, &mut params);
+    let mut root_type_environment = TypeEnvironment::new();
+    infer_type(root, &mut root_type_environment);
 }
 
-fn add_symbol(name: &String, symbol_type: &Type, params: &mut Params)
-{
-    // Add the binding type to the current symbol table
-    let (symbols, local_symbols) = params.get_mut();
-
-    let previous_entry = symbols.insert(name.clone(), symbol_type.clone());
-
-    // Save the original type of the symbol if needed
-    if !local_symbols.contains_key(name)
-    {
-        local_symbols.insert(name.clone(), previous_entry);
-    }
-}
-
-fn restore_symbol_table(symbols: &mut SymbolTable, new_local_symbols: LocalSymbolTable)
-{
-    // Restore symbol types to what they were before this scope
-    for (name, original_entry) in new_local_symbols
-    {
-        if let Some(original_type) = original_entry
-        {
-            // The symbol was previously bound to something
-            symbols.insert(name, original_type);
-        }
-        else
-        {
-            // The symbol was not previously bound to anything
-            symbols.remove(&name);
-        }
-    }
-}
-
-fn infer_type(node: &mut Node, params: &mut Params)
+fn infer_type(node: &mut Node, environment: &mut TypeEnvironment)
 {
     match node
     {
@@ -107,28 +15,26 @@ fn infer_type(node: &mut Node, params: &mut Params)
         {}
         Node::Variable(data) =>
         {
-            let symbols = params.get_symbols();
-
-            match symbols.get(data.get_name())
+            match environment.get_type_of(data.get_name())
             {
-                // Look up types for variables from the current symbol table
                 Some(symbol_type) =>
                 {
                     data.set_type(symbol_type.clone());
                 }
                 None =>
-                {}
+                {
+                    // Failed to find the type of this symbol
+                }
             }
         }
 
         Node::Call(data) =>
         {
             // Try to infer the types of operator and operands first
-            data.recur_transformation(infer_type, params);
-            // note: currently no primitive operators actually depend on operand types
-            let (operator, operands, _) = data.get_all_mut();
+            data.recur_transformation(infer_type, environment);
 
             // Handle primitive operators whose types depend on operand types
+            let (operator, operands, _) = data.get_all_mut();
             if let Node::PrimitiveOperator(operator_data) = operator
             {
                 match operator_data.get_operator()
@@ -203,7 +109,7 @@ fn infer_type(node: &mut Node, params: &mut Params)
             // (ref v:T) : (ref T)
 
             // Try to infer the type of the target first
-            data.recur_transformation(infer_type, params);
+            data.recur_transformation(infer_type, environment);
 
             // The result is a reference to the original type
             let target_type = data.get_target().get_type().clone();
@@ -216,7 +122,7 @@ fn infer_type(node: &mut Node, params: &mut Params)
             // (deref v:&T) : T
 
             // Try to infer the type of the target first
-            data.recur_transformation(infer_type, params);
+            data.recur_transformation(infer_type, environment);
 
             // The result is dereferences the original type if possible
             let target_type = data.get_target().get_type().clone();
@@ -229,83 +135,105 @@ fn infer_type(node: &mut Node, params: &mut Params)
         Node::Binding(data) =>
         {
             // Infer the type of the binding
-            data.recur_transformation(infer_type, params);
+            data.recur_transformation(infer_type, environment);
 
-            let name = data.get_name();
-            let binding_type = data.get_binding().get_type();
+            let binding_type = data.get_binding().get_type().clone();
 
             // Track the symbol type
-            add_symbol(name, binding_type, params);
+            environment.add_binding(data.get_name(), &binding_type);
 
             // Keep track of the binding type
-            // note: the binding node might change during compilation
-            data.set_binding_type(binding_type.clone());
+            // note: the binding node might change during compilation, and we don't want to lose type information
+            data.set_binding_type(binding_type);
         }
         Node::Assignment(_) =>
         {
-            node.recur_transformation(infer_type, params);
+            node.recur_transformation(infer_type, environment);
         }
 
         Node::Sequence(data) =>
         {
             if data.is_transparent()
             {
-                // Collect definitions from within the body of the sequence
-                collect_definition_types(data.get_nodes(), params);
-
                 // Transparent sequences don't introduce a new scope
                 // note: transparent sequences are only used internally,
                 //       so this doesn't matter for type-checking user programs
-                data.recur_transformation(infer_type, params);
+
+                // First, collect definitions from within the body of the sequence
+                collect_definition_types(data.get_nodes(), environment);
+
+                // Type check the body of the sequence
+                data.recur_transformation(infer_type, environment);
             }
             else
             {
-                // Save original types if bindings shadow other bindings
-                let symbols = params.get_symbols_mut();
-                let mut new_local_symbols = LocalSymbolTable::new();
-
-                let mut new_params: Params = Params::new(symbols, &mut new_local_symbols);
+                // Create a new local scope from the original environment
+                let mut new_environment = environment.fork();
 
                 // Collect definitions from within the body of the sequence
-                collect_definition_types(data.get_nodes(), &mut new_params);
+                collect_definition_types(data.get_nodes(), &mut new_environment);
 
-                // Infer the type of each child node
-                data.recur_transformation(infer_type, &mut new_params);
+                // Infer the type of each child node in the new environment
+                data.recur_transformation(infer_type, &mut new_environment);
+            }
 
-                // Restore the symbol table to what it was before the sequence
-                restore_symbol_table(symbols, new_local_symbols);
+            // The type of a sequence...
+            //  - with only definitions is the type of the last definition
+            //  - with any non-definition nodes is the type of the last non-definition node
+            let mut last_non_definition_node: Option<&Node> = None;
+            for node in data.get_nodes().iter()
+            {
+                if !node.is_definition()
+                {
+                    last_non_definition_node = Some(node);
+                }
+            }
+
+            if let Some(node) = last_non_definition_node
+            {
+                let node_type = node.get_type().clone();
+                data.set_type(node_type);
+            }
+            else
+            {
+                if let Some(node) = data.get_nodes().last()
+                {
+                    let node_type = node.get_type().clone();
+                    data.set_type(node_type);
+                }
+                else
+                {
+                    data.set_type(Type::new(DataType::Void));
+                }
             }
         }
         Node::Conditional(data) =>
         {
             // Infer types in the condition and branches
-            data.recur_transformation(infer_type, params);
+            data.recur_transformation(infer_type, environment);
         }
 
         Node::Function(data) =>
         {
-            // Save original types if bindings shadow other bindings
-            let symbols = params.get_symbols_mut();
-            let mut new_local_symbols = LocalSymbolTable::new();
+            // Create a new local scope from the original environment
+            // note: we ignore any bindings, since they can't be used inside the body of the new function
+            let mut new_environment = environment.fork_definitions_only();
 
-            let mut new_params: Params = Params::new(symbols, &mut new_local_symbols);
-
-            // Bind argument types
-            for argument in data.get_arguments()
+            // Add bindings for each of the function arguments
+            for argument in data.get_arguments().iter()
             {
-                add_symbol(argument.get_name(), argument.get_type(), &mut new_params);
+                new_environment.add_binding(argument.get_name(), argument.get_type());
             }
 
-            // Infer the type of the body
-            data.recur_transformation(infer_type, &mut new_params);
-
-            // Restore the symbol table to what it was before the function
-            restore_symbol_table(symbols, new_local_symbols);
+            // Infer the type of the body using the new environment
+            data.recur_transformation(infer_type, &mut new_environment);
         }
     }
 }
 
-fn collect_definition_types(nodes: &Vec<Node>, params: &mut Params)
+// Collect definitions from a sequence of nodes
+// note: so definitions can be order-independent
+fn collect_definition_types(nodes: &Vec<Node>, environment: &mut TypeEnvironment)
 {
     for node in nodes.iter()
     {
@@ -313,10 +241,73 @@ fn collect_definition_types(nodes: &Vec<Node>, params: &mut Params)
         {
             Node::Function(data) =>
             {
-                add_symbol(data.get_name(), data.get_type(), params);
+                environment.add_definition(data.get_name(), data.get_type());
             }
             _ =>
             {}
         }
+    }
+}
+
+type SymbolTable = HashMap<String, Type>;
+struct TypeEnvironment
+{
+    bindings:    SymbolTable,
+    definitions: SymbolTable,
+}
+impl TypeEnvironment
+{
+    pub fn add_binding(&mut self, name: &String, binding_type: &Type)
+    {
+        let _original_entry = self.bindings.insert(name.clone(), binding_type.clone());
+    }
+    pub fn add_definition(&mut self, name: &String, definition_type: &Type)
+    {
+        let _original_entry = self
+            .definitions
+            .insert(name.clone(), definition_type.clone());
+    }
+
+    pub fn get_type_of(&self, name: &String) -> Option<&Type>
+    {
+        // Check bindings first
+        match self.bindings.get(name)
+        {
+            Some(value) =>
+            {
+                return Some(value);
+            }
+            None =>
+            {}
+        }
+
+        // Then check definitions
+        return self.definitions.get(name);
+    }
+
+    pub fn new() -> Self
+    {
+        return Self {
+            bindings:    SymbolTable::new(),
+            definitions: SymbolTable::new(),
+        };
+    }
+
+    // Duplicate this environment so inner-scopes don't leak bindings/definitions
+    pub fn fork(&self) -> TypeEnvironment
+    {
+        return TypeEnvironment {
+            bindings:    self.bindings.clone(),
+            definitions: self.definitions.clone(),
+        };
+    }
+
+    // Duplicate this environment, but clear binding types (for function bodies)
+    pub fn fork_definitions_only(&self) -> TypeEnvironment
+    {
+        return TypeEnvironment {
+            bindings:    SymbolTable::new(),
+            definitions: self.definitions.clone(),
+        };
     }
 }

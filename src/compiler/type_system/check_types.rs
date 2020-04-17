@@ -24,7 +24,7 @@ type TypeErrors = Vec<TypeError>;
 pub fn apply(root: &Node) -> Option<TypeErrors>
 {
     let mut errors = TypeErrors::new();
-    root.parse_recursive(check_type, &mut errors);
+    check_type(root, &mut errors);
 
     if errors.is_empty()
     {
@@ -38,8 +38,9 @@ pub fn apply(root: &Node) -> Option<TypeErrors>
 
 fn check_type(node: &Node, errors: &mut TypeErrors)
 {
+    node.recur_parse(check_type, errors);
+    
     let mut new_errors: Vec<TypeError> = Vec::new();
-
     match node
     {
         Node::Nothing | Node::Integer(_) | Node::Boolean(_) =>

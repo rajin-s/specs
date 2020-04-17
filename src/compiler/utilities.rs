@@ -27,12 +27,13 @@ pub fn print_types(node: &Node)
     let mut _params = ();
 
     println!("Types:");
-    node.parse_recursive(print_type, &mut _params);
+    print_type(node, &mut _params);
     println!("");
 
     fn print_type(node: &Node, _params: &mut ())
     {
         println!("\t{:8} : {}", format!("{}", node.get_type()), node);
+        node.recur_parse(print_type, _params);
     }
 
 }

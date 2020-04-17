@@ -1,8 +1,9 @@
 use crate::language::nodes::*;
 
+mod type_system;
 mod checks;
 mod passes;
-mod type_system;
+mod output;
 
 mod utilities;
 
@@ -64,14 +65,16 @@ impl Compiler
         }
         // Do passes
 
+        
         remove_single_sequences::apply(&mut self.root_node);
         extract_conditionals::apply(&mut self.root_node);
         extract_sequences::apply(&mut self.root_node);
-
+        
         insert_returns::apply(&mut self.root_node);
+        make_definition_names_unique::apply(&mut self.root_node);
 
         // Generate output
-        let output = write_c::apply(&self.root_node);
+        let output = output::get_c_string(&self.root_node);
         return Some(output);
     }
 

@@ -18,7 +18,7 @@ type NodeErrors = Vec<NodeError>;
 pub fn apply(root: &Node) -> Option<NodeErrors>
 {
     let mut errors = NodeErrors::new();
-    root.parse_recursive(check, &mut errors);
+    check(root, &mut errors);
 
     if errors.is_empty()
     {
@@ -33,6 +33,7 @@ pub fn apply(root: &Node) -> Option<NodeErrors>
 // Accumulate errors from checking a node
 fn check(node: &Node, errors: &mut NodeErrors)
 {
+    node.recur_parse(check, errors);
     if let Some(mut new_errors) = check_node(node)
     {
         errors.append(&mut new_errors);

@@ -53,48 +53,72 @@ fn Add
 
 (Add-10 (Add 5 1))
 
-fn Foo -> int
-{
-    1 + z # <- should result in a type error
-}
+# fn Foo -> int
+# {
+#     1 + z # <- z is free, so this results in a type error
+# }
 
 <<< Inner Definitions
     (order independent within scope) >>>
 
-<<<
 
 fn Factorial [n int] -> int
 {
-    (Accumulator n 0)
+    (Accumulator n 1)
 
-    fn Accumulator [n int] [acc int] -> int
+    fn Accumulator
+        [n int]
+        [acc int]
+        -> int
     {
-        if n <= 1 then a
+        if n <= 1 then acc
         else (Accumulator (n + -1) (Multiply n acc 0))
     }
 
-    fn Multiply [a int] [b int] [acc int] -> int
+    fn Multiply
+        [a int]
+        [b int]
+        [acc int]
+        -> int
     {
         if b == 0 then acc
-        else (Multiply a (b + -1) (b + acc))
+        else (Multiply a (b + -1) (a + acc))
     }
 }
 
-if (Is-Even 5) then
+fn Fibonacci [n int] -> int
 {
-    (Add-100 (Get-100))
+    (Accumulator n 1 1)
 
-    fn Add-100 [x int] -> int { x + 100 }
-    fn Get-100 -> int { 100 }
+    fn Accumulator
+        [n int]
+        [prev int]
+        [acc int]
+        -> int
+    {
+        if n == 0 then acc
+        else (Accumulator (n + -1) acc (prev + acc))
+    }
 }
-else
-{
-    fn Add-100 [x int] -> int { x + 50 + 50 }
-    fn Get-100 -> int { (Add-100 0) }
 
-    (Add-100 (Get-100))
-}
+(Factorial 5) + (Fibonacci 5)
 
+# if (Is-Even 5) then
+# {
+#     (Add-100 (Get-100))
+
+#     fn Add-100 [x int] -> int { x + 100 }
+#     fn Get-100 -> int { 100 }
+# }
+# else
+# {
+#     fn Add-100 [x int] -> int { x + 50 + 50 }
+#     fn Get-100 -> int { (Add-100 0) }
+
+#     (Add-100 (Get-100))
+# }
+
+<<<
 <<< Function pointers
     (no closures yet!) >>>
 

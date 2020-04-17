@@ -46,65 +46,12 @@ impl Node
         }
     }
 
-    pub fn parse_recursive<TParams>(&self, function: fn(&Node, &mut TParams), params: &mut TParams)
+    pub fn is_definition(&self) -> bool
     {
-        use Node::*;
-
-        function(self, params);
-
         match self
         {
-            Nothing | Integer(_) | Boolean(_) | Variable(_) =>
-            {}
-
-            Call(data) =>
-            {
-                data.get_operator().parse_recursive(function, params);
-                for child in data.get_operands().iter()
-                {
-                    child.parse_recursive(function, params);
-                }
-            }
-            PrimitiveOperator(_) =>
-            {}
-
-            Reference(data) =>
-            {
-                data.get_target().parse_recursive(function, params);
-            }
-            Dereference(data) =>
-            {
-                data.get_target().parse_recursive(function, params);
-            }
-
-            Binding(data) =>
-            {
-                data.get_binding().parse_recursive(function, params);
-            }
-            Assignment(data) =>
-            {
-                data.get_lhs().parse_recursive(function, params);
-                data.get_rhs().parse_recursive(function, params);
-            }
-
-            Sequence(data) =>
-            {
-                for child in data.get_nodes().iter()
-                {
-                    child.parse_recursive(function, params);
-                }
-            }
-            Conditional(data) =>
-            {
-                data.get_condition().parse_recursive(function, params);
-                data.get_then().parse_recursive(function, params);
-                data.get_else().parse_recursive(function, params);
-            }
-
-            Function(data) =>
-            {
-                data.get_body().parse_recursive(function, params);
-            }
+            Node::Function(_) => true,
+            _ => false,
         }
     }
 }
@@ -145,6 +92,10 @@ pub trait NodeRecur
     {
         // Does nothing by default (no child nodes to recur into)
     }
+    fn recur_parse<TParams>(&self, function: fn(&Node, &mut TParams), params: &mut TParams)
+    {
+        // Does nothing by default (no child nodes to recur into)
+    }
 }
 impl NodeRecur for Node
 {
@@ -175,6 +126,31 @@ impl NodeRecur for Node
             Node::Conditional(data) => data.recur_transformation(function, params),
 
             Node::Function(data) => data.recur_transformation(function, params),
+        }
+    }
+    fn recur_parse<TParams>(&self, function: fn(&Node, &mut TParams), params: &mut TParams)
+    {
+        match self
+        {
+            Node::Nothing
+            | Node::Integer(_)
+            | Node::Boolean(_)
+            | Node::Variable(_)
+            | Node::PrimitiveOperator(_) =>
+            {}
+
+            Node::Call(data) => data.recur_parse(function, params),
+
+            Node::Reference(data) => data.recur_parse(function, params),
+            Node::Dereference(data) => data.recur_parse(function, params),
+
+            Node::Binding(data) => data.recur_parse(function, params),
+            Node::Assignment(data) => data.recur_parse(function, params),
+
+            Node::Sequence(data) => data.recur_parse(function, params),
+            Node::Conditional(data) => data.recur_parse(function, params),
+
+            Node::Function(data) => data.recur_parse(function, params),
         }
     }
 }
@@ -288,6 +264,10 @@ impl VariableNodeData
     {
         return &self.name;
     }
+    pub fn set_name(&mut self, new_name: String)
+    {
+        self.name = new_name;
+    }
 
     pub fn new(name: String) -> Self
     {
@@ -366,6 +346,14 @@ impl NodeRecur for CallNodeData
     {
         function(self.get_operator_mut(), params);
         for operand in self.get_operands_mut().iter_mut()
+        {
+            function(operand, params);
+        }
+    }
+    fn recur_parse<TParams>(&self, function: fn(&Node, &mut TParams), params: &mut TParams)
+    {
+        function(self.get_operator(), params);
+        for operand in self.get_operands().iter()
         {
             function(operand, params);
         }
@@ -453,6 +441,10 @@ impl NodeRecur for ReferenceNodeData
     {
         function(self.get_target_mut(), params);
     }
+    fn recur_parse<TParams>(&self, function: fn(&Node, &mut TParams), params: &mut TParams)
+    {
+        function(self.get_target(), params);
+    }
 }
 impl_typed!(ReferenceNodeData);
 impl_to_node!(ReferenceNodeData, Node::Reference);
@@ -491,6 +483,10 @@ impl NodeRecur for DereferenceNodeData
     )
     {
         function(self.get_target_mut(), params);
+    }
+    fn recur_parse<TParams>(&self, function: fn(&Node, &mut TParams), params: &mut TParams)
+    {
+        function(self.get_target(), params);
     }
 }
 impl_typed!(DereferenceNodeData);
@@ -559,6 +555,10 @@ impl NodeRecur for BindingNodeData
     {
         function(self.get_binding_mut(), params);
     }
+    fn recur_parse<TParams>(&self, function: fn(&Node, &mut TParams), params: &mut TParams)
+    {
+        function(self.get_binding(), params);
+    }
 }
 impl_to_node!(BindingNodeData, Node::Binding);
 
@@ -606,6 +606,11 @@ impl NodeRecur for AssignmentNodeData
         function(self.get_lhs_mut(), params);
         function(self.get_rhs_mut(), params);
     }
+    fn recur_parse<TParams>(&self, function: fn(&Node, &mut TParams), params: &mut TParams)
+    {
+        function(self.get_lhs(), params);
+        function(self.get_rhs(), params);
+    }
 }
 impl_to_node!(AssignmentNodeData, Node::Assignment);
 
@@ -614,6 +619,7 @@ pub struct SequenceNodeData
 {
     nodes:          Vec<Node>,
     is_transparent: bool,
+    node_type:      Type,
 }
 impl SequenceNodeData
 {
@@ -624,6 +630,37 @@ impl SequenceNodeData
     pub fn get_nodes_mut(&mut self) -> &mut Vec<Node>
     {
         return &mut self.nodes;
+    }
+
+    pub fn get_final_node_index(&self) -> Option<usize>
+    {
+        if self.get_nodes().is_empty()
+        {
+            return None;
+        }
+
+        let mut final_index: Option<usize> = None;
+        for (i, node) in self.get_nodes().iter().enumerate()
+        {
+            match node
+            {
+                Node::Function(_) =>
+                {}
+                _ =>
+                {
+                    final_index = Some(i);
+                }
+            }
+        }
+
+        if final_index == None
+        {
+            return Some(self.get_nodes().len() - 1);
+        }
+        else
+        {
+            return final_index;
+        }
     }
 
     pub fn get_final_node(&self) -> Option<&Node>
@@ -645,6 +682,7 @@ impl SequenceNodeData
         return Self {
             nodes:          nodes,
             is_transparent: false,
+            node_type:      Type::unknown(),
         };
     }
     pub fn new_transparent(nodes: Vec<Node>) -> Self
@@ -652,6 +690,7 @@ impl SequenceNodeData
         return Self {
             nodes:          nodes,
             is_transparent: true,
+            node_type:      Type::unknown(),
         };
     }
 }
@@ -668,22 +707,15 @@ impl NodeRecur for SequenceNodeData
             function(node, params);
         }
     }
-}
-impl Typed for SequenceNodeData
-{
-    fn get_type(&self) -> &Type
+    fn recur_parse<TParams>(&self, function: fn(&Node, &mut TParams), params: &mut TParams)
     {
-        if let Some(node) = self.nodes.last()
+        for node in self.get_nodes().iter()
         {
-            return node.get_type();
-        }
-        else
-        {
-            static VOID_TYPE: Type = Type::new_constant(DataType::Void);
-            return &VOID_TYPE;
+            function(node, params);
         }
     }
 }
+impl_typed!(SequenceNodeData);
 impl_to_node!(SequenceNodeData, Node::Sequence);
 
 #[derive(Clone)]
@@ -752,6 +784,12 @@ impl NodeRecur for ConditionalNodeData
         function(self.get_then_mut(), params);
         function(self.get_else_mut(), params);
     }
+    fn recur_parse<TParams>(&self, function: fn(&Node, &mut TParams), params: &mut TParams)
+    {
+        function(self.get_condition(), params);
+        function(self.get_then(), params);
+        function(self.get_else(), params);
+    }
 }
 impl Typed for ConditionalNodeData
 {
@@ -808,6 +846,11 @@ impl FunctionNodeData
     {
         return &self.name;
     }
+    pub fn set_name(&mut self, new_name: String)
+    {
+        self.name = new_name;
+    }
+
     pub fn get_arguments(&self) -> &Vec<ArgumentData>
     {
         return &self.arguments;
@@ -857,6 +900,10 @@ impl NodeRecur for FunctionNodeData
     )
     {
         function(self.get_body_mut(), params);
+    }
+    fn recur_parse<TParams>(&self, function: fn(&Node, &mut TParams), params: &mut TParams)
+    {
+        function(self.get_body(), params);
     }
 }
 impl_typed!(FunctionNodeData);
