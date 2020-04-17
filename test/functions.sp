@@ -61,7 +61,6 @@ fn Add
 <<< Inner Definitions
     (order independent within scope) >>>
 
-
 fn Factorial [n int] -> int
 {
     (Accumulator n 1)
@@ -71,8 +70,9 @@ fn Factorial [n int] -> int
         [acc int]
         -> int
     {
-        if n <= 1 then acc
-        else (Accumulator (n + -1) (Multiply n acc 0))
+        if n <= 1
+            then acc
+            else (Accumulator (n + -1) (Multiply n acc 0))
     }
 
     fn Multiply
@@ -81,8 +81,18 @@ fn Factorial [n int] -> int
         [acc int]
         -> int
     {
-        if b == 0 then acc
-        else (Multiply a (b + -1) (a + acc))
+        fn Accumulator
+            [a int]
+            [b int]
+            [acc int]
+            -> int
+        {
+            if b == 0
+                then acc
+                else (Accumulator a (b + -1) (a + acc))
+        }
+
+        (Accumulator a b 0)
     }
 }
 
@@ -91,17 +101,31 @@ fn Fibonacci [n int] -> int
     (Accumulator n 1 1)
 
     fn Accumulator
-        [n int]
+        [n    int]
         [prev int]
-        [acc int]
+        [acc  int]
         -> int
     {
-        if n == 0 then acc
-        else (Accumulator (n + -1) acc (prev + acc))
+        if n == 0
+            then acc
+            else (Accumulator (n + -1) acc (prev + acc))
     }
 }
 
 (Factorial 5) + (Fibonacci 5)
+
+<<< Alternate-style
+    argument list >>>
+
+# fn Foo
+#     bar   : bool
+#     n     : int
+#     x     : FooBarBaz
+#     y-z-w : BazBarFoo
+#     -> bool
+# {
+#     ...
+# }
 
 # if (Is-Even 5) then
 # {

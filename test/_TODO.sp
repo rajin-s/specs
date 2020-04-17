@@ -1,6 +1,4 @@
 <<< TO DO
-    < > Get rid of "then" in if parsing?
-
     <✔> Top-level functions
     < > Local/definition symbol table separation in type checker
     < > Function validation
@@ -13,4 +11,9 @@
 
     < > Parsing reference types
     < > Ownership
+>>>
+
+<<< POTENTIAL CHANGES
+    < > Remove "then" from if statements
+    < > Change arguments to "x : T" instead of "[x T]"
 >>>

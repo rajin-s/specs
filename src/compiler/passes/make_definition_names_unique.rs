@@ -22,13 +22,14 @@ fn make_function_names_unique(node: &mut Node, environment: &mut Environment)
         Node::Function(data) =>
         {
             let new_name = environment.get_scoped_name(data.get_name());
-            data.set_name(new_name);
-
+            
             environment.push_scope(data.get_name().clone(), Context::FunctionBody);
             {
                 data.recur_transformation(make_function_names_unique, environment);
             }
             environment.pop_scope();
+            
+            data.set_name(new_name);
         }
         Node::Binding(data) =>
         {
