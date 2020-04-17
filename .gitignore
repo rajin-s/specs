@@ -5,3 +5,5 @@
 **/*.lnk
 
 **/*.log
+test/*.c
+test/exes/
