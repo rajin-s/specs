@@ -12,9 +12,15 @@ let z = (Add-10 (Add-10 4))
 
 fn Is-Even [x int] -> bool
 {
-    if x == 0 then true
-    else if x < 0 then false
-    else (Is-Even x + -2)
+    when
+    {
+        x == 0 => true
+        x < 0  => false
+    }
+    else
+    {
+        (Is-Even x + -2)
+    }
 }
 
 let seven-is-even = (Is-Even 7)
@@ -22,26 +28,21 @@ let seven-is-even = (Is-Even 7)
 fn Is-Seven [x int] -> bool
 {
     # 6 and 8 are definitely not seven, so we have an early out
-    if x == 6 then
+    when
     {
-        false
-    }
-    else if x == 8 then
-    {
-        false
-    }
-    else if (Is-Even x) then
-    {
-        false
+        x == 6      => false
+        x == 8      => false
+        (Is-Even x) => false
+
     }
     else
     {
-        2 == x + -5
+        (2 == x + -5)
     }
 }
 
 let seven-is-seven = (Is-Seven 7)
-let foo = (Is-Seven (Add-10 -3))
+let foo            = (Is-Seven (Add-10 -3))
 
 fn Add
     [a int]
@@ -66,30 +67,35 @@ fn Factorial [n int] -> int
     (Accumulator n 1)
 
     fn Accumulator
-        [n int]
+        [n int  ]
         [acc int]
         -> int
     {
         if n <= 1
             then acc
-            else (Accumulator (n + -1) (Multiply n acc 0))
+            else (Accumulator
+                    n + -1
+                    (Multiply n acc 0))
     }
 
     fn Multiply
-        [a int]
-        [b int]
+        [a int  ]
+        [b int  ]
         [acc int]
         -> int
     {
         fn Accumulator
-            [a int]
-            [b int]
+            [a int  ]
+            [b int  ]
             [acc int]
             -> int
         {
             if b == 0
                 then acc
-                else (Accumulator a (b + -1) (a + acc))
+                else (Accumulator
+                        a
+                        (b + -1)
+                        (a + acc))
         }
 
         (Accumulator a b 0)
@@ -108,7 +114,10 @@ fn Fibonacci [n int] -> int
     {
         if n == 0
             then acc
-            else (Accumulator (n + -1) acc (prev + acc))
+            else (Accumulator
+                    (n + -1)
+                    acc
+                    (prev + acc))
     }
 }
 
@@ -117,15 +126,19 @@ fn Fibonacci [n int] -> int
 <<< Alternate-style
     argument list >>>
 
-# fn Foo
-#     bar   : bool
-#     n     : int
-#     x     : FooBarBaz
-#     y-z-w : BazBarFoo
-#     -> bool
+# fn DotProduct
+#     A-x : int
+#     A-y : int
+#     B-x : int
+#     B-y : int
+#     -> int
 # {
-#     ...
+#     (A-x * B-x) + (A-y * B-y)
 # }
+
+# (DotProduct
+#     1 4
+#     5 2)
 
 # if (Is-Even 5) then
 # {

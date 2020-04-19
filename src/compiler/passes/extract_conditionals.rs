@@ -671,17 +671,85 @@ fn extract_conditionals(node: &mut Node, temp_names: &mut TempNameGenerator)
                 // Ignore non-returning sequences, since we don't need to get a value out of those
                 if !data.get_type().is_void()
                 {
-                    fn get_final_node(node: &mut Node) -> &mut Node
+                    let target_node = data.get_final_node_mut().unwrap();
+
+                    let temp_name = temp_names.next();
+                    let target_type = target_node.get_type().clone();
+
+                    // Extract the target node
+                    let mut original_target = Node::Nothing;
+                    swap(&mut original_target, target_node);
+
+                    // original_target -> (if ...)
+                    // target_node     -> Nothing
+
+                    if let Node::Conditional(mut conditional_data) = original_target
                     {
-                        if let Node::Sequence(data) = node
+                        let mut temp = Node::Nothing;
+
+                        // Convert then branch into an assignment
                         {
-                            return data.get_final_node_mut().unwrap();
+                            swap(&mut temp, conditional_data.get_then_mut());
+                            temp = Node::from(AssignmentNodeData::new(
+                                make_temp_variable(&temp_name, &target_type),
+                                temp,
+                            ));
+
+                            // The RHS could be a conditional
+                            extract_conditionals(&mut temp, temp_names);
+
+                            swap(&mut temp, conditional_data.get_then_mut());
                         }
 
+                        // Convert else branch into an assignment
+                        {
+                            swap(&mut temp, conditional_data.get_else_mut());
+                            temp = Node::from(AssignmentNodeData::new(
+                                make_temp_variable(&temp_name, &target_type),
+                                temp,
+                            ));
+
+                            // The RHS could be a conditional
+                            extract_conditionals(&mut temp, temp_names);
+
+                            swap(&mut temp, conditional_data.get_else_mut());
+                        }
+
+                        // let temp = Nothing
+                        let bind_temp = Node::from(BindingNodeData::new_empty(
+                            temp_name.clone(),
+                            target_type.clone(),
+                        ));
+
+                        // (if ... then (temp = A) else (temp = B))
+                        let mut assign_temp = Node::from(conditional_data);
+
+                        // Put the conditional back where it was in the sequence
+                        // note: this is different from default behavior in lift_conditional
+                        swap(&mut assign_temp, target_node);
+
+                        // Extract the original node, which contains the modified conditional
+                        let mut use_temp = Node::Nothing;
+                        swap(&mut use_temp, node);
+
+                        let return_temp = make_temp_variable(&temp_name, &target_type);
+
+                        // Create the new enclosing sequence
+                        let mut outer_sequence =
+                            Node::from(SequenceNodeData::new_transparent(vec![
+                                bind_temp,
+                                use_temp,
+                                return_temp,
+                            ]));
+
+                        // Replace the original node with the new sequence
+                        swap(&mut outer_sequence, node);
+                    }
+                    else
+                    {
+                        // We know the target is a conditional
                         unreachable!();
                     }
-
-                    lift_conditional(node, get_final_node, temp_names);
                 }
             }
         }

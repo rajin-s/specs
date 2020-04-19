@@ -144,13 +144,21 @@ fn parse_node(node: &Node, context: &mut FormatContext)
         {
             let s = context.get_typed_identifier(data.get_name(), data.get_binding_type());
             context.write(s);
-            context.write_str(" = ");
 
-            context.push_group("binding", false, false);
+            match data.get_binding()
             {
-                parse_node(data.get_binding(), context);
+                Node::Nothing =>
+                {}
+                _ =>
+                {
+                    context.write_str(" = ");
+                    context.push_group("binding", false, false);
+                    {
+                        parse_node(data.get_binding(), context);
+                    }
+                    context.pop_group();
+                }
             }
-            context.pop_group();
         }
         Node::Assignment(data) =>
         {
@@ -201,7 +209,7 @@ fn parse_node(node: &Node, context: &mut FormatContext)
 
                 let then_needs_bracket = match data.get_then()
                 {
-                    Node::Sequence(_) => false,
+                    Node::Sequence(sequence_data) => sequence_data.is_transparent(),
                     _ => true,
                 };
                 context.start_line();
@@ -229,7 +237,7 @@ fn parse_node(node: &Node, context: &mut FormatContext)
                     context.write_str("else");
                     let else_needs_bracket = match data.get_else()
                     {
-                        Node::Sequence(_) => false,
+                        Node::Sequence(sequence_data) => sequence_data.is_transparent(),
                         _ => true,
                     };
                     context.start_line();

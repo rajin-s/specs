@@ -22,5 +22,3 @@ int BAR(int a, int b)
     printf("Call BAR\n");
     return a | b;
 }
-
-int foo = '1234';

@@ -85,3 +85,64 @@ else
 {
     discard (BAR 3 4)
 }
+
+<<< When blocks >>>
+
+when
+{
+    A : B
+    C : D
+    E : F
+}
+else
+{
+    G
+}
+
+#=>
+
+(if A
+    then B
+    else
+    (if C
+        then D
+        else
+        (if E
+            then F
+            else { G })))
+
+let cool =
+    when
+    {
+        (func-1 1 2 3) : true
+        (func-2 4 5)   : (func-3 5 2)
+
+        1 + 3 < 12 : false
+        3 + 2 > 4  : (func-4 1 2 3 4)
+    }
+    else
+    {
+        true
+    }
+
+let N = 100
+when
+{
+    (N == 100) then
+    {
+        (do-stuff ...)
+        (do-stuff ...)
+        (do-stuff ...)
+    }
+
+    (N < 40) then
+    {
+        (do-stuff ...)
+    }
+
+    else
+    {
+        (do-stuff ...)
+        (do-stuff ...)
+    }
+}

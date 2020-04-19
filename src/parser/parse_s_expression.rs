@@ -66,8 +66,14 @@ fn strip_comments(source: &str) -> String
                 block_comment_start_count += 1;
                 block_comment_end_count = 0;
 
+                // This is potentially just a normal character, so it might end up in the output
+                end = i + 1;
+
                 if block_comment_start_count == symbols::keywords::BLOCK_COMMENT_CHAR_COUNT
                 {
+                    // This and the preceding open chars weren't normal characters, so remove them from the output
+                    end -= symbols::keywords::BLOCK_COMMENT_CHAR_COUNT;
+
                     // This was the last start char needed to open a new block
                     block_comment_open_count += 1;
                     block_comment_start_count = 0;
@@ -95,8 +101,14 @@ fn strip_comments(source: &str) -> String
                 block_comment_end_count += 1;
                 block_comment_start_count = 0;
 
+                // This is potentially just a normal character, so it might end up in the output
+                end = i + 1;
+
                 if block_comment_end_count == symbols::keywords::BLOCK_COMMENT_CHAR_COUNT
                 {
+                    // This and the preceding open chars weren't normal characters, so remove them from the output
+                    end -= symbols::keywords::BLOCK_COMMENT_CHAR_COUNT;
+
                     // This was the last end char needed to close a block
 
                     // Make sure there is a block to close
@@ -190,7 +202,7 @@ fn strip_comments(source: &str) -> String
         // There are characters left that have not been pushed into a segment
         if start == 0
         {
-            // There is only one segment, so just re-use the original str
+            // There is only one segment, so just re-use the original string
             return String::from(&source[0..end]);
         }
         else

@@ -269,6 +269,101 @@ pub fn parse_node_recursive(expression: &SExpression) -> ParseResult
                                 }
                             }
                         }
+                        // (when {...} else else_branch)
+                        [Symbol(when_keyword), List(BracketType::Curly, when_expressions), Symbol(else_keyword), else_expression]
+                            if when_keyword == symbols::keywords::WHEN
+                                && else_keyword == symbols::keywords::ELSE =>
+                        {
+                            let mut branch_nodes: Vec<(Node, Node)> = Vec::new();
+                            for when_expression in when_expressions.iter()
+                            {
+                                match parse_when_branch(when_expression)
+                                {
+                                    Ok(nodes) => branch_nodes.push(nodes),
+                                    Err(mut new_errors) => errors.append(&mut new_errors),
+                                }
+                            }
+
+                            match parse_node_recursive(else_expression)
+                            {
+                                Ok(else_node) =>
+                                {
+                                    // Make sure none of the branches produced an error
+                                    if errors.is_empty()
+                                    {
+                                        if branch_nodes.is_empty()
+                                        {
+                                            // A when with no branch nodes just executes the else
+                                            return Ok(else_node);
+                                        }
+                                        else
+                                        {
+                                            // We want the else branch to happen after the *last* condition branch
+                                            branch_nodes.reverse();
+
+                                            // Build up the final node
+                                            let mut node = else_node;
+                                            for (condition, result) in branch_nodes
+                                            {
+                                                node = Node::from(ConditionalNodeData::new(
+                                                    condition, result, node,
+                                                ));
+                                            }
+
+                                            return Ok(node);
+                                        }
+                                    }
+                                }
+                                Err(mut new_errors) =>
+                                {
+                                    errors.append(&mut new_errors);
+                                }
+                            }
+
+                            return Err(errors);
+                        }
+                        // (when {...})
+                        [Symbol(when_keyword), List(BracketType::Curly, when_expressions)]
+                            if when_keyword == symbols::keywords::WHEN =>
+                        {
+                            let mut branch_nodes: Vec<(Node, Node)> = Vec::new();
+                            for when_expression in when_expressions.iter()
+                            {
+                                match parse_when_branch(when_expression)
+                                {
+                                    Ok(nodes) => branch_nodes.push(nodes),
+                                    Err(mut new_errors) => errors.append(&mut new_errors),
+                                }
+                            }
+
+                            // Make sure none of the branches produced an error
+                            if errors.is_empty()
+                            {
+                                if branch_nodes.is_empty()
+                                {
+                                    // A when with no branch nodes does nothing (equivalent to an empty sequence)
+                                    return Ok(Node::from(SequenceNodeData::new(vec![])));
+                                }
+                                else
+                                {
+                                    // We want successive branches to be checked *after* the previous branch
+                                    branch_nodes.reverse();
+                                    
+                                    // Build up the final node
+                                    let mut node = Node::Nothing;
+                                    for (condition, result) in branch_nodes
+                                    {
+                                        node = Node::from(ConditionalNodeData::new(
+                                            condition, result, node,
+                                        ));
+                                    }
+
+                                    return Ok(node);
+                                }
+                            }
+
+                            return Err(errors);
+                        }
 
                         // (fn name {body})
                         [Symbol(function_keyword), Symbol(name), body_expression]
@@ -617,6 +712,53 @@ fn parse_type(expression: &SExpression) -> Result<Type, ParseErrorList>
         }
     }
 }
+fn parse_when_branch(expression: &SExpression) -> Result<(Node, Node), ParseErrorList>
+{
+    let mut errors = ParseErrorList::new();
+
+    match expression
+    {
+        SExpression::List(BracketType::None, elements) => match elements.as_slice()
+        {
+            [condition_expression, SExpression::Symbol(associate_keyword), result_expression]
+                if associate_keyword == symbols::keywords::ASSOCIATE =>
+            {
+                match (
+                    parse_node_recursive(condition_expression),
+                    parse_node_recursive(result_expression),
+                )
+                {
+                    (Ok(condition_node), Ok(result_node)) =>
+                    {
+                        return Ok((condition_node, result_node));
+                    }
+                    (condition_result, result_result) =>
+                    {
+                        if let Err(mut new_errors) = condition_result
+                        {
+                            errors.append(&mut new_errors);
+                        }
+                        if let Err(mut new_errors) = result_result
+                        {
+                            errors.append(&mut new_errors);
+                        }
+                    }
+                }
+            }
+            _ =>
+            {
+                errors.push(ParseError::InvalidWhenBranch(expression.clone()));
+            }
+        },
+        _ =>
+        {
+            errors.push(ParseError::InvalidWhenBranch(expression.clone()));
+        }
+    }
+
+    return Err(errors);
+}
+
 fn parse_arguments(expressions: &Vec<SExpression>) -> Result<Vec<ArgumentData>, ParseErrorList>
 {
     let mut errors = ParseErrorList::new();

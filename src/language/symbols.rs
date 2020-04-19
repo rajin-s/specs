@@ -145,6 +145,9 @@ pub mod keywords
         "if" => IF,
         "then" => THEN,
         "else" => ELSE,
+        "when" => WHEN,
+        "=>" => ASSOCIATE,
+        ":" => ASSOCIATE_TYPE,
         "#" => COMMENT
     ];
 

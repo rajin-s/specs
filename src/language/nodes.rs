@@ -665,11 +665,19 @@ impl SequenceNodeData
 
     pub fn get_final_node(&self) -> Option<&Node>
     {
-        return self.nodes.last();
+        match self.get_final_node_index()
+        {
+            Some(index) => self.nodes.get(index),
+            None => None,
+        }
     }
     pub fn get_final_node_mut(&mut self) -> Option<&mut Node>
     {
-        return self.nodes.last_mut();
+        match self.get_final_node_index()
+        {
+            Some(index) => self.nodes.get_mut(index),
+            None => None,
+        }
     }
 
     pub fn is_transparent(&self) -> bool

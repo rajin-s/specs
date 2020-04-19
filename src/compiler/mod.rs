@@ -1,9 +1,9 @@
 use crate::language::nodes::*;
 
-mod type_system;
 mod checks;
-mod passes;
 mod output;
+mod passes;
+mod type_system;
 
 mod utilities;
 
@@ -63,15 +63,22 @@ impl Compiler
 
             return None;
         }
-        // Do passes
 
-        
-        remove_single_sequences::apply(&mut self.root_node);
-        extract_conditionals::apply(&mut self.root_node);
-        extract_sequences::apply(&mut self.root_node);
-        
-        insert_returns::apply(&mut self.root_node);
-        make_definition_names_unique::apply(&mut self.root_node);
+        // Do passes
+        fn do_pass(pass: fn(&mut Node), target: &mut Compiler, name: &str)
+        {
+            pass(&mut target.root_node);
+            if target.options.show_debug_output
+            {
+                println!("{}\n{}\n", name, &target.root_node);
+            }
+        }
+
+        do_pass(remove_single_sequences::apply, self, "Remove Single Sequences");
+        do_pass(extract_conditionals::apply, self, "Extract Conditionals");
+        do_pass(extract_sequences::apply, self, "Extract Sequences");
+        do_pass(insert_returns::apply, self, "Insert Returns");
+        do_pass(make_definition_names_unique::apply, self, "Make Definition Names Unique");
 
         // Generate output
         let output = output::get_c_string(&self.root_node);
