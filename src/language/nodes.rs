@@ -20,11 +20,12 @@ pub enum Node
 
     Binding(BindingNodeData),
     Assignment(AssignmentNodeData),
-
     Sequence(SequenceNodeData),
     Conditional(ConditionalNodeData),
-
     Function(FunctionNodeData),
+
+    Type(TypeNodeData),
+    Access(AccessNodeData),
 }
 impl Node
 {
@@ -55,13 +56,15 @@ impl Node
         }
     }
 }
+
 impl Typed for Node
 {
     fn get_type(&self) -> &Type
     {
         match self
         {
-            Node::Nothing => Type::void_ref(),
+            Node::Nothing | Node::Binding(_) | Node::Assignment(_) => basic_types::void(),
+
             Node::Integer(data) => data.get_type(),
             Node::Boolean(data) => data.get_type(),
             Node::Variable(data) => data.get_type(),
@@ -72,13 +75,13 @@ impl Typed for Node
             Node::Reference(data) => data.get_type(),
             Node::Dereference(data) => data.get_type(),
 
-            Node::Binding(_) => Type::void_ref(),
-            Node::Assignment(_) => Type::void_ref(),
-
             Node::Sequence(data) => data.get_type(),
             Node::Conditional(data) => data.get_type(),
 
             Node::Function(data) => data.get_type(),
+
+            Node::Type(data) => data.get_type(),
+            Node::Access(data) => data.get_type(),
         }
     }
 }
@@ -86,78 +89,66 @@ pub trait NodeRecur
 {
     fn recur_transformation<TParams>(
         &mut self,
-        function: fn(&mut Node, &mut TParams),
-        params: &mut TParams,
+        _function: fn(&mut Node, &mut TParams),
+        _params: &mut TParams,
     )
     {
         // Does nothing by default (no child nodes to recur into)
     }
-    fn recur_parse<TParams>(&self, function: fn(&Node, &mut TParams), params: &mut TParams)
+    fn recur_parse<TParams>(&self, _function: fn(&Node, &mut TParams), _params: &mut TParams)
     {
         // Does nothing by default (no child nodes to recur into)
+    }
+}
+pub trait ToNode
+{
+    fn to_node(self) -> Node;
+}
+
+macro_rules! generate_node_recur {
+    (terminal : [$( $terminal:path ),*], data : [$( $data:path),*]) => {
+        fn recur_transformation<TParams>(&mut self, function: fn(&mut Node, &mut TParams), params: &mut TParams)
+        {
+            match self
+            {
+                Node::Nothing => {},
+                $( $terminal(_) => {}, )*
+                $( $data(data) => data.recur_transformation(function,params), )*
+            }
+        }
+        fn recur_parse<TParams>(&self, function: fn(&Node, &mut TParams), params: &mut TParams)
+        {
+            match self
+            {
+                Node::Nothing => {},
+                $( $terminal(_) => {}, )*
+                $( $data(data) => data.recur_parse(function,params), )*
+            }
+        }
     }
 }
 impl NodeRecur for Node
 {
-    fn recur_transformation<TParams>(
-        &mut self,
-        function: fn(&mut Node, &mut TParams),
-        params: &mut TParams,
-    )
-    {
-        match self
-        {
-            Node::Nothing
-            | Node::Integer(_)
-            | Node::Boolean(_)
-            | Node::Variable(_)
-            | Node::PrimitiveOperator(_) =>
-            {}
-
-            Node::Call(data) => data.recur_transformation(function, params),
-
-            Node::Reference(data) => data.recur_transformation(function, params),
-            Node::Dereference(data) => data.recur_transformation(function, params),
-
-            Node::Binding(data) => data.recur_transformation(function, params),
-            Node::Assignment(data) => data.recur_transformation(function, params),
-
-            Node::Sequence(data) => data.recur_transformation(function, params),
-            Node::Conditional(data) => data.recur_transformation(function, params),
-
-            Node::Function(data) => data.recur_transformation(function, params),
-        }
-    }
-    fn recur_parse<TParams>(&self, function: fn(&Node, &mut TParams), params: &mut TParams)
-    {
-        match self
-        {
-            Node::Nothing
-            | Node::Integer(_)
-            | Node::Boolean(_)
-            | Node::Variable(_)
-            | Node::PrimitiveOperator(_) =>
-            {}
-
-            Node::Call(data) => data.recur_parse(function, params),
-
-            Node::Reference(data) => data.recur_parse(function, params),
-            Node::Dereference(data) => data.recur_parse(function, params),
-
-            Node::Binding(data) => data.recur_parse(function, params),
-            Node::Assignment(data) => data.recur_parse(function, params),
-
-            Node::Sequence(data) => data.recur_parse(function, params),
-            Node::Conditional(data) => data.recur_parse(function, params),
-
-            Node::Function(data) => data.recur_parse(function, params),
-        }
-    }
-}
-
-pub trait ToNode
-{
-    fn to_node(self) -> Node;
+    generate_node_recur!(
+        terminal : [
+            Node::Integer,
+            Node::Boolean,
+            Node::Variable,
+            Node::PrimitiveOperator
+        ],
+        data : [
+            Node::Call,
+            Node::Conditional,
+            Node::Reference,
+            Node::Dereference,
+            Node::Binding,
+            Node::Assignment,
+            Node::Sequence,
+            Node::Function,
+            Node::Type,
+            Node::Access
+        ]
+    );
 }
 
 /* -------------------------------------------------------------------------- */
@@ -205,10 +196,7 @@ pub struct IntegerNodeData
 }
 impl IntegerNodeData
 {
-    pub fn get_value(&self) -> i64
-    {
-        return self.value;
-    }
+    get!(value : get_value -> i64);
 
     pub fn new(value: i64) -> Self
     {
@@ -219,8 +207,7 @@ impl Typed for IntegerNodeData
 {
     fn get_type(&self) -> &Type
     {
-        static INTEGER_TYPE: Type = Type::new_constant(DataType::Integer);
-        return &INTEGER_TYPE;
+        return basic_types::integer();
     }
 }
 impl_to_node!(IntegerNodeData, Node::Integer);
@@ -232,10 +219,7 @@ pub struct BooleanNodeData
 }
 impl BooleanNodeData
 {
-    pub fn get_value(&self) -> bool
-    {
-        return self.value;
-    }
+    get!(value : get_value -> bool);
 
     pub fn new(value: bool) -> Self
     {
@@ -246,8 +230,7 @@ impl Typed for BooleanNodeData
 {
     fn get_type(&self) -> &Type
     {
-        static BOOLEAN_TYPE: Type = Type::new_constant(DataType::Boolean);
-        return &BOOLEAN_TYPE;
+        return basic_types::boolean();
     }
 }
 impl_to_node!(BooleanNodeData, Node::Boolean);
@@ -260,10 +243,8 @@ pub struct VariableNodeData
 }
 impl VariableNodeData
 {
-    pub fn get_name(&self) -> &String
-    {
-        return &self.name;
-    }
+    get!(name : get_name -> &String);
+
     pub fn set_name(&mut self, new_name: String)
     {
         self.name = new_name;
@@ -301,22 +282,10 @@ pub struct CallNodeData
 }
 impl CallNodeData
 {
-    pub fn get_operator(&self) -> &Node
-    {
-        return self.operator.as_ref();
-    }
-    pub fn get_operands(&self) -> &Vec<Node>
-    {
-        return &self.operands;
-    }
-    pub fn get_operator_mut(&mut self) -> &mut Node
-    {
-        return self.operator.as_mut();
-    }
-    pub fn get_operands_mut(&mut self) -> &mut Vec<Node>
-    {
-        return &mut self.operands;
-    }
+    get!(operator : get_operator -> &Node);
+    get!(operands : get_operands -> &Vec<Node>);
+    get!(operator : get_operator_mut -> &mut Node);
+    get!(operands : get_operands_mut -> &mut Vec<Node>);
 
     pub fn get_all_mut(&mut self) -> (&mut Node, &mut Vec<Node>, &mut Type)
     {
@@ -370,10 +339,7 @@ pub struct PrimitiveOperatorNodeData
 }
 impl PrimitiveOperatorNodeData
 {
-    pub fn get_operator(&self) -> PrimitiveOperator
-    {
-        return self.operator;
-    }
+    get!(operator : get_operator -> PrimitiveOperator);
 
     pub fn new(operator: PrimitiveOperator) -> Self
     {
@@ -400,19 +366,10 @@ pub struct ReferenceNodeData
 }
 impl ReferenceNodeData
 {
-    pub fn get_target(&self) -> &Node
-    {
-        return self.target_node.as_ref();
-    }
-    pub fn get_target_mut(&mut self) -> &mut Node
-    {
-        return self.target_node.as_mut();
-    }
+    get!(target_node : get_target -> &Node);
+    get!(target_node : get_target_mut -> &mut Node);
 
-    pub fn get_reference_type(&self) -> Reference
-    {
-        return self.reference_type;
-    }
+    get!(reference_type : get_reference_type -> Reference);
 
     pub fn new(target_node: Node, reference_type: Reference) -> Self
     {
@@ -457,14 +414,8 @@ pub struct DereferenceNodeData
 }
 impl DereferenceNodeData
 {
-    pub fn get_target(&self) -> &Node
-    {
-        return self.target_node.as_ref();
-    }
-    pub fn get_target_mut(&mut self) -> &mut Node
-    {
-        return self.target_node.as_mut();
-    }
+    get!(target_node : get_target -> &Node);
+    get!(target_node : get_target_mut -> &mut Node);
 
     pub fn new(target_node: Node) -> Self
     {
@@ -506,23 +457,12 @@ pub struct BindingNodeData
 }
 impl BindingNodeData
 {
-    pub fn get_name(&self) -> &String
-    {
-        return &self.name;
-    }
-    pub fn get_binding(&self) -> &Node
-    {
-        return self.binding_node.as_ref();
-    }
-    pub fn get_binding_mut(&mut self) -> &mut Node
-    {
-        return self.binding_node.as_mut();
-    }
+    get!(name : get_name -> &String);
 
-    pub fn get_binding_type(&self) -> &Type
-    {
-        return &self.binding_type;
-    }
+    get!(binding_node : get_binding -> &Node);
+    get!(binding_node : get_binding_mut -> &mut Node);
+
+    get!(binding_type : get_binding_type -> &Type);
     pub fn set_binding_type(&mut self, new_type: Type)
     {
         self.binding_type = new_type;
@@ -570,22 +510,10 @@ pub struct AssignmentNodeData
 }
 impl AssignmentNodeData
 {
-    pub fn get_rhs(&self) -> &Node
-    {
-        return self.rhs.as_ref();
-    }
-    pub fn get_rhs_mut(&mut self) -> &mut Node
-    {
-        return self.rhs.as_mut();
-    }
-    pub fn get_lhs(&self) -> &Node
-    {
-        return self.lhs.as_ref();
-    }
-    pub fn get_lhs_mut(&mut self) -> &mut Node
-    {
-        return self.lhs.as_mut();
-    }
+    get!(lhs : get_lhs -> &Node);
+    get!(lhs : get_lhs_mut -> &mut Node);
+    get!(rhs : get_rhs -> &Node);
+    get!(rhs : get_rhs_mut -> &mut Node);
 
     pub fn new(lhs: Node, rhs: Node) -> Self
     {
@@ -623,14 +551,8 @@ pub struct SequenceNodeData
 }
 impl SequenceNodeData
 {
-    pub fn get_nodes(&self) -> &Vec<Node>
-    {
-        return &self.nodes;
-    }
-    pub fn get_nodes_mut(&mut self) -> &mut Vec<Node>
-    {
-        return &mut self.nodes;
-    }
+    get!(nodes : get_nodes -> &Vec<Node>);
+    get!(nodes : get_nodes_mut -> &mut Vec<Node>);
 
     pub fn get_final_node_index(&self) -> Option<usize>
     {
@@ -735,31 +657,12 @@ pub struct ConditionalNodeData
 }
 impl ConditionalNodeData
 {
-    pub fn get_condition(&self) -> &Node
-    {
-        return self.condition_node.as_ref();
-    }
-    pub fn get_then(&self) -> &Node
-    {
-        return self.then_node.as_ref();
-    }
-    pub fn get_else(&self) -> &Node
-    {
-        return self.else_node.as_ref();
-    }
-
-    pub fn get_condition_mut(&mut self) -> &mut Node
-    {
-        return self.condition_node.as_mut();
-    }
-    pub fn get_then_mut(&mut self) -> &mut Node
-    {
-        return self.then_node.as_mut();
-    }
-    pub fn get_else_mut(&mut self) -> &mut Node
-    {
-        return self.else_node.as_mut();
-    }
+    get!(condition_node : get_condition -> &Node);
+    get!(condition_node : get_condition_mut -> &mut Node);
+    get!(then_node : get_then -> &Node);
+    get!(then_node : get_then_mut -> &mut Node);
+    get!(else_node : get_else -> &Node);
+    get!(else_node : get_else_mut -> &mut Node);
 
     pub fn has_else(&self) -> bool
     {
@@ -820,14 +723,8 @@ pub struct ArgumentData
 }
 impl ArgumentData
 {
-    pub fn get_name(&self) -> &String
-    {
-        return &self.name;
-    }
-    pub fn get_type(&self) -> &Type
-    {
-        return &self.argument_type;
-    }
+    get!(name : get_name -> &String);
+    get!(argument_type : get_type -> &Type);
 
     pub fn new(name: String, argument_type: Type) -> Self
     {
@@ -850,41 +747,38 @@ pub struct FunctionNodeData
 }
 impl FunctionNodeData
 {
-    pub fn get_name(&self) -> &String
-    {
-        return &self.name;
-    }
+    get!(arguments : get_arguments -> &Vec<ArgumentData>);
+    get!(arguments : get_arguments_mut -> &mut Vec<ArgumentData>);
+    get!(body_node : get_body -> &Node);
+    get!(body_node : get_body_mut -> &mut Node);
+
+    get!(name : get_name -> &String);
+    get!(return_type: get_return_type -> &Type);
+
     pub fn set_name(&mut self, new_name: String)
     {
         self.name = new_name;
     }
 
-    pub fn get_arguments(&self) -> &Vec<ArgumentData>
+    pub fn new(
+        name: String,
+        arguments: Vec<ArgumentData>,
+        return_type: Type,
+        body: Node,
+        metadata: FunctionMetadata,
+    ) -> Self
     {
-        return &self.arguments;
-    }
-    pub fn get_return_type(&self) -> &Type
-    {
-        return &self.return_type;
-    }
-
-    pub fn get_body(&self) -> &Node
-    {
-        return self.body_node.as_ref();
-    }
-    pub fn get_body_mut(&mut self) -> &mut Node
-    {
-        return self.body_node.as_mut();
-    }
-
-    pub fn new(name: String, arguments: Vec<ArgumentData>, return_type: Type, body: Node) -> Self
-    {
+        // Build the function type based on node data
         let mut argument_types = Vec::new();
         for argument in arguments.iter()
         {
             argument_types.push(argument.get_type().clone());
         }
-        let function_type = Type::from(CallableTypeData::new(argument_types, return_type.clone()));
+        let function_type = Type::from(FunctionTypeData::new(
+            argument_types,
+            return_type.clone(),
+            metadata,
+        ));
 
         return Self {
             name:        name,
@@ -894,9 +788,14 @@ impl FunctionNodeData
             return_type: return_type,
         };
     }
-    pub fn new_infer_type(name: String, arguments: Vec<ArgumentData>, body: Node) -> Self
+    pub fn new_infer_type(
+        name: String,
+        arguments: Vec<ArgumentData>,
+        body: Node,
+        metadata: FunctionMetadata,
+    ) -> Self
     {
-        return FunctionNodeData::new(name, arguments, body.get_type().clone(), body);
+        return FunctionNodeData::new(name, arguments, body.get_type().clone(), body, metadata);
     }
 }
 impl NodeRecur for FunctionNodeData
@@ -916,3 +815,229 @@ impl NodeRecur for FunctionNodeData
 }
 impl_typed!(FunctionNodeData);
 impl_to_node!(FunctionNodeData, Node::Function);
+
+/* -------------------------------------------------------------------------- */
+/*                                 Structures                                 */
+/* -------------------------------------------------------------------------- */
+
+#[derive(Clone)]
+pub struct MemberData
+{
+    name:             String,
+    member_type:      Type,
+    read_visibility:  Visibility,
+    write_visibility: Visibility,
+    scope:            MemberScope,
+}
+impl MemberData
+{
+    get!(name : get_name -> &String);
+    get!(member_type : get_type -> &Type);
+
+    get!(read_visibility : get_read_visibility -> Visibility);
+    get!(write_visibility : get_write_visibility -> Visibility);
+
+    get!(scope : get_scope -> MemberScope);
+
+    pub fn set_read_visibility(&mut self, visibility: Visibility)
+    {
+        self.read_visibility = visibility;
+    }
+    pub fn set_write_visibility(&mut self, visibility: Visibility)
+    {
+        self.write_visibility = visibility;
+    }
+
+    pub fn new(
+        name: String,
+        member_type: Type,
+        read_visibility: Visibility,
+        write_visibility: Visibility,
+        scope: MemberScope,
+    ) -> Self
+    {
+        return Self {
+            name:             name,
+            member_type:      member_type,
+            read_visibility:  read_visibility,
+            write_visibility: write_visibility,
+            scope:            scope,
+        };
+    }
+}
+
+#[derive(Clone)]
+pub struct MethodData
+{
+    function_data: FunctionNodeData,
+    visibility:    Visibility,
+    scope:         MemberScope,
+}
+impl MethodData
+{
+    get!(function_data : get_function_data -> &FunctionNodeData);
+    get!(function_data : get_function_data_mut -> &mut FunctionNodeData);
+
+    get!(visibility : get_visibility -> Visibility);
+    get!(scope : get_scope -> MemberScope);
+
+    pub fn set_visibility(&mut self, visibility: Visibility)
+    {
+        self.visibility = visibility;
+    }
+
+    pub fn new(function_data: FunctionNodeData, visibility: Visibility, scope: MemberScope)
+        -> Self
+    {
+        return Self {
+            function_data: function_data,
+            visibility:    visibility,
+            scope:         scope,
+        };
+    }
+}
+#[derive(Clone)]
+pub struct TraitData
+{
+    name: String,
+}
+impl TraitData
+{
+    get!(name : get_name -> &String);
+
+    pub fn new(name: String) -> Self
+    {
+        return Self { name: name };
+    }
+}
+
+#[derive(Clone)]
+pub struct TypeNodeData
+{
+    name: String,
+
+    members: Vec<MemberData>,
+    methods: Vec<MethodData>,
+    traits:  Vec<TraitData>,
+
+    node_type: Type,
+}
+impl TypeNodeData
+{
+    get!(methods : get_methods -> &Vec<MethodData>);
+    get!(methods : get_methods_mut -> &mut Vec<MethodData>);
+
+    get!(members : get_members -> &Vec<MemberData>);
+    get!(members : get_members_mut -> &mut Vec<MemberData>);
+
+    get!(traits : get_traits -> &Vec<TraitData>);
+    get!(traits : get_traits_mut -> &mut Vec<TraitData>);
+
+    get!(name : get_name -> &String);
+    get!(name : get_name_mut -> &mut String);
+
+    pub fn get_instance_type(&self) -> Type
+    {
+        return Type::from(InstanceTypeData::new(self.name.clone()));
+    }
+
+    pub fn add_trait_name(&mut self, name: String)
+    {
+        self.traits.push(TraitData::new(name));
+    }
+
+    pub fn set_name(&mut self, name: String)
+    {
+        self.name = name;
+    }
+
+    pub fn new_empty(name: String) -> Self
+    {
+        return Self {
+            name:      name,
+            members:   Vec::new(),
+            methods:   Vec::new(),
+            traits:    Vec::new(),
+            node_type: Type::unknown(),
+        };
+    }
+}
+
+impl NodeRecur for TypeNodeData
+{
+    fn recur_transformation<TParams>(
+        &mut self,
+        function: fn(&mut Node, &mut TParams),
+        params: &mut TParams,
+    )
+    {
+        for method in self.get_methods_mut().iter_mut()
+        {
+            function(method.get_function_data_mut().get_body_mut(), params);
+        }
+    }
+    fn recur_parse<TParams>(&self, function: fn(&Node, &mut TParams), params: &mut TParams)
+    {
+        for method in self.get_methods().iter()
+        {
+            function(method.get_function_data().get_body(), params);
+        }
+    }
+}
+impl_typed!(TypeNodeData);
+impl_to_node!(TypeNodeData, Node::Type);
+
+#[derive(Clone)]
+pub struct AccessNodeData
+{
+    target:        OtherNode,
+    property_name: String,
+
+    node_type: Type,
+}
+impl AccessNodeData
+{
+    get!(target : get_target -> &Node);
+    get!(target : get_target_mut -> &mut Node);
+
+    get!(property_name : get_property -> &String);
+
+    pub fn new(target: Node, property_name: String) -> Self
+    {
+        return Self {
+            target:        OtherNode::new(target),
+            property_name: property_name,
+            node_type:     Type::unknown(),
+        };
+    }
+}
+impl NodeRecur for AccessNodeData
+{
+    fn recur_transformation<TParams>(
+        &mut self,
+        function: fn(&mut Node, &mut TParams),
+        params: &mut TParams,
+    )
+    {
+        function(self.get_target_mut(), params);
+    }
+    fn recur_parse<TParams>(&self, function: fn(&Node, &mut TParams), params: &mut TParams)
+    {
+        function(self.get_target(), params);
+    }
+}
+impl_typed!(AccessNodeData);
+impl_to_node!(AccessNodeData, Node::Access);
+
+/*
+
+    TO DO
+
+    Add basic support for type nodes (Display, checks)
+    Add type checking for structure types
+    Convert instance methods to static methods
+    Extract methods
+    Handle allocation, references, etc.
+    Add output for structure types
+
+*/

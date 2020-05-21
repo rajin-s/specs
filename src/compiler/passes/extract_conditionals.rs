@@ -765,6 +765,38 @@ fn extract_conditionals(node: &mut Node, temp_names: &mut TempNameGenerator)
         {
             // Functions don't need to change
         }
+
+        Node::Type(_data) =>
+        {
+            // Types don't need to change
+        }
+        Node::Access(data) =>
+        {
+            /* Access
+                ((if A then B else C) . property)
+                =>
+                {
+                    let temp = Nothing
+                    (if A then (temp = B) else (temp = C))
+                    (temp . property)
+                }
+            */
+
+            if let Node::Conditional(_) = data.get_target()
+            {
+                fn get_target(node: &mut Node) -> &mut Node
+                {
+                    if let Node::Access(data) = node
+                    {
+                        return data.get_target_mut();
+                    }
+
+                    unreachable!();
+                }
+
+                lift_conditional(node, get_target, temp_names);
+            }
+        }
     }
 }
 

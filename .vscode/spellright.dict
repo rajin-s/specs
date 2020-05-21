@@ -4,3 +4,7 @@ mut
 fn
 std
 arg
+...
+(...)
+args
+sizeof

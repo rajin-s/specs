@@ -16,4 +16,9 @@ pub enum PrimitiveOperator
     And,
     Or,
     ExclusiveOr,
+
+    // Memory operators
+    Create,
+    HeapAllocate,
+    HeapFree,
 }

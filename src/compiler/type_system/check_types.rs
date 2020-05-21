@@ -39,7 +39,6 @@ pub fn apply(root: &Node) -> Option<TypeErrors>
 fn check_type(node: &Node, errors: &mut TypeErrors)
 {
     node.recur_parse(check_type, errors);
-    
     let mut new_errors: Vec<TypeError> = Vec::new();
     match node
     {
@@ -61,10 +60,10 @@ fn check_type(node: &Node, errors: &mut TypeErrors)
             //  - correct argument types
             let operator_type = data.get_operator().get_type();
 
-            if let DataType::Callable(callable_data) = operator_type.get_data_type()
+            if let DataType::Function(function_data) = operator_type.get_data_type()
             {
                 let operands = data.get_operands();
-                let argument_types = callable_data.get_argument_types();
+                let argument_types = function_data.get_argument_types();
 
                 // Make sure the number of arguments is correct
                 if argument_types.len() == operands.len()
@@ -137,8 +136,8 @@ fn check_type(node: &Node, errors: &mut TypeErrors)
         {}
         Node::Conditional(data) =>
         {
-            const BOOLEAN_TYPE: Type = Type::new_constant(DataType::Boolean);
-            if data.get_condition().get_type() != &BOOLEAN_TYPE
+            let condition_type = data.get_condition().get_type();
+            if !(condition_type.is_value() && condition_type.data_type_is(DataType::Boolean))
             {
                 new_errors.push(TypeError::InvalidConditionType(
                     data.get_condition().get_type().clone(),
@@ -165,6 +164,11 @@ fn check_type(node: &Node, errors: &mut TypeErrors)
                 ));
             }
         }
+
+        Node::Type(_) =>
+        {}
+        Node::Access(_) =>
+        {}
     }
 
     errors.append(&mut new_errors);

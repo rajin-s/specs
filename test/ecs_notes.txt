@@ -1,0 +1,75 @@
+Types
+    Component : C
+    Access    : A = read | write
+    
+    Entity : E = { C1, C2, C3, ... , CN }
+
+    System : S = S.Cs : { C1, C2, C3, ... , CN }
+                 S.As : { A1, A2, A3, ... , AN }
+
+Relations
+    (S handles E) when (E ⊆ S.Cs)
+
+    (S1 is compatible with S2) when
+        A. share no components: (S1.Cs ∩ S2.Cs) == {}
+        B. share only reads:    for all (N M), (S1.CN == S2.CM) <-> (S1.AN == S2.AM == write)
+
+
+Implementation
+
+    Components
+        - All data for a type is stored in a contiguous array
+        - Iteration is efficient as used by systems
+        - Can be arbitrarily referenced
+    Systems
+        - Operate on sets (including intersections, complements, and cross products)
+        - Can be scheduled to run in parallel if they're compatible
+    Entities
+        - Contain minimal data
+        - Have a GUID
+
+Fixed contiguous components
+System stores working set of groupings
+    - Components referenced like normal (or with index)
+    - (AddComponent) ->
+        allocate data (location irrelevant)
+        check each relevant system
+            allocate working set element
+        - pretty heavy
+            multiple allocations
+            needs to check every system associated with the type
+            bad for components associated with lots of systems
+    - (RemoveComponent) ->
+        remove from each relevant system
+        de-allocate data
+    - (System.UpdateAll) ->
+        already has working set
+
+Fixed contiguous components
+    - Components are referenced like normal (or with index)
+    - (AddComponent) ->
+        find insert location
+        allocate data and link
+    - (RemoveComponent) ->
+        unlink data
+    - (System.UpdateAll) ->
+        step through all component lists (not linear in memory)
+        find matching ID and process
+        - Can be heavy => linear in length of longest component list
+        - Bad for components associated with lots of systems
+
+Moving contiguous components
+    - Components can't be referenced like normal (index changes)
+    - (AddComponent) ->
+        find insert location
+        allocate data and shift array
+        update all references somehow
+    - (RemoveComponent) ->
+        find delete location
+        delete data and shift array
+        invalidate all references somehow
+    - (System.UpdateAll) ->
+        step through component lists (linear in memory)
+        find matching ID and process
+        - Can be heavy => linear in length of longest component list
+        - Bad for components associated with lots of systems

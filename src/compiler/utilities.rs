@@ -27,13 +27,19 @@ pub fn print_types(node: &Node)
     let mut _params = ();
 
     println!("Types:");
-    print_type(node, &mut _params);
+    print_type(node, &mut 0);
     println!("");
 
-    fn print_type(node: &Node, _params: &mut ())
+    fn print_type(node: &Node, indent: &mut usize)
     {
-        println!("\t{:8} : {}", format!("{}", node.get_type()), node);
-        node.recur_parse(print_type, _params);
+        for _ in 0..(*indent + 1)
+        {
+            print!("\t");
+        }
+
+        print!("{} : {}\n", node.get_type(), node);
+
+        node.recur_parse(print_type, &mut (*indent + 1));
     }
 
 }

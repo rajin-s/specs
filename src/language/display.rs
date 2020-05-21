@@ -31,6 +31,11 @@ impl fmt::Display for Node
                 PrimitiveOperator::And => write!(f, "and"),
                 PrimitiveOperator::Or => write!(f, "or"),
                 PrimitiveOperator::ExclusiveOr => write!(f, "xor"),
+
+                // Memory operators
+                PrimitiveOperator::Create => write!(f, "create"),
+                PrimitiveOperator::HeapAllocate => write!(f, "heap-allocate"),
+                PrimitiveOperator::HeapFree => write!(f, "heap-free"),
             },
             Node::Call(data) =>
             {
@@ -95,6 +100,80 @@ impl fmt::Display for Node
                 }
                 write!(f, "-> {} {}>", data.get_return_type(), data.get_body())
             }
+
+            Node::Type(data) =>
+            {
+                write!(f, "(type {} {{ ", data.get_name());
+
+                write!(f, "<data {{ ");
+                for member in data.get_members().iter()
+                {
+                    let scope_prefix = match member.get_scope()
+                    {
+                        MemberScope::Instance => "self.",
+                        MemberScope::Static => "",
+                    };
+                    let read_visibility = match member.get_read_visibility()
+                    {
+                        Visibility::Private => "private",
+                        Visibility::Public => "public",
+                    };
+                    let write_visibility = match member.get_write_visibility()
+                    {
+                        Visibility::Private => "private",
+                        Visibility::Public => "public",
+                    };
+
+                    write!(
+                        f,
+                        "[{}{} {} ({} read / {} write)] ",
+                        scope_prefix,
+                        member.get_name(),
+                        member.get_type(),
+                        read_visibility,
+                        write_visibility
+                    );
+                }
+                write!(f, "}}> ");
+                write!(f, "<methods {{ ");
+                for method in data.get_methods().iter()
+                {
+                    let scope_prefix = match method.get_scope()
+                    {
+                        MemberScope::Instance => "self.",
+                        MemberScope::Static => "",
+                    };
+                    let visibility = match method.get_visibility()
+                    {
+                        Visibility::Private => "private",
+                        Visibility::Public => "public",
+                    };
+
+                    let function = method.get_function_data();
+
+                    write!(
+                        f,
+                        "<{} fn {}{} ",
+                        visibility,
+                        scope_prefix,
+                        function.get_name()
+                    );
+                    for argument in function.get_arguments().iter()
+                    {
+                        write!(f, "[{} {}] ", argument.get_name(), argument.get_type());
+                    }
+                    write!(
+                        f,
+                        "-> {} {}> ",
+                        function.get_return_type(),
+                        function.get_body()
+                    );
+                }
+                write!(f, "}}>");
+
+                write!(f, " }})")
+            }
+            Node::Access(data) => write!(f, "({} . {})", data.get_target(), data.get_property()),
         }
     }
 }
@@ -124,7 +203,7 @@ impl fmt::Display for Type
             DataType::Void => write!(f, "Void"),
             DataType::Integer => write!(f, "Int"),
             DataType::Boolean => write!(f, "Bool"),
-            DataType::Callable(data) =>
+            DataType::Function(data) =>
             {
                 write!(f, "(");
                 for argument_type in data.get_argument_types().iter()
@@ -133,6 +212,35 @@ impl fmt::Display for Type
                 }
                 write!(f, "-> {})", data.get_return_type())
             }
+
+            DataType::Type(data) =>
+            {
+                write!(f, "[type {}]", data.get_name())
+                // match data.get_name()
+                // {
+                //     Some(name) =>
+                //     {
+                //         write!(f, "(type {}", name);
+                //     }
+                //     None =>
+                //     {
+                //         write!(f, "(type");
+                //     }
+                // }
+
+                // if !data.get_traits().is_empty()
+                // {
+                //     write!(f, " is {{ ");
+                //     for t in data.get_traits().iter()
+                //     {
+                //         write!(f, "{} ", t.get_name());
+                //     }
+                //     write!(f, "}}");
+                // }
+
+                // write!(f, " {} members)", data.get_members().len())
+            }
+            DataType::Instance(data) => write!(f, "{}", data.get_name()),
         }
     }
 }

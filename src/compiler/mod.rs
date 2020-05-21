@@ -78,7 +78,10 @@ impl Compiler
         do_pass(extract_conditionals::apply, self, "Extract Conditionals");
         do_pass(extract_sequences::apply, self, "Extract Sequences");
         do_pass(insert_returns::apply, self, "Insert Returns");
+        do_pass(convert_instance_methods::apply, self, "Convert Instance Methods");
         do_pass(make_definition_names_unique::apply, self, "Make Definition Names Unique");
+
+        do_pass(expand_memory_operators::apply, self, "Expand Memory Operators");
 
         // Generate output
         let output = output::get_c_string(&self.root_node);

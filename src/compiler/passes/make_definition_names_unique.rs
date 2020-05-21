@@ -5,10 +5,10 @@ use std::collections::HashMap;
 pub fn apply(root_node: &mut Node)
 {
     let mut environment = Environment::new();
-    root_node.recur_transformation(make_function_names_unique, &mut environment);
+    root_node.recur_transformation(make_definition_names_unique, &mut environment);
 }
 
-fn make_function_names_unique(node: &mut Node, environment: &mut Environment)
+fn make_definition_names_unique(node: &mut Node, environment: &mut Environment)
 {
     match node
     {
@@ -25,7 +25,7 @@ fn make_function_names_unique(node: &mut Node, environment: &mut Environment)
             
             environment.push_scope(data.get_name().clone(), Context::FunctionBody);
             {
-                data.recur_transformation(make_function_names_unique, environment);
+                data.recur_transformation(make_definition_names_unique, environment);
             }
             environment.pop_scope();
             
@@ -33,7 +33,7 @@ fn make_function_names_unique(node: &mut Node, environment: &mut Environment)
         }
         Node::Binding(data) =>
         {
-            data.recur_transformation(make_function_names_unique, environment);
+            data.recur_transformation(make_definition_names_unique, environment);
 
             // Remove overrides so they don't affect nodes after a binding with the same name
             if let Some(_new_name) = environment.get_override(data.get_name())
@@ -88,7 +88,7 @@ fn make_function_names_unique(node: &mut Node, environment: &mut Environment)
                 }
             }
 
-            data.recur_transformation(make_function_names_unique, environment);
+            data.recur_transformation(make_definition_names_unique, environment);
 
             if added_anonymous_scope
             {
@@ -101,9 +101,31 @@ fn make_function_names_unique(node: &mut Node, environment: &mut Environment)
                 environment.remove_override(name);
             }
         }
+        Node::Type(data) =>
+        {
+            let new_name = environment.get_scoped_name(data.get_name());
+            
+            // Insert scope for the type body
+            environment.push_scope(data.get_name().clone(), Context::TypeBody);
+            {
+                // Insert scopes for each method body
+                for method in data.get_methods_mut().iter_mut()
+                {
+                    let function_data = method.get_function_data_mut();
+                    environment.push_scope(function_data.get_name().clone(), Context::FunctionBody);
+                    {
+                        function_data.recur_transformation(make_definition_names_unique, environment);
+                    }
+                    environment.pop_scope();
+                }
+            }
+            environment.pop_scope();
+
+            data.set_name(new_name);
+        }
         node =>
         {
-            node.recur_transformation(make_function_names_unique, environment);
+            node.recur_transformation(make_definition_names_unique, environment);
         }
     }
 }
@@ -112,6 +134,7 @@ fn make_function_names_unique(node: &mut Node, environment: &mut Environment)
 enum Context
 {
     FunctionBody,
+    TypeBody,
     Generic,
 }
 

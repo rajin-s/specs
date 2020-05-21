@@ -61,7 +61,7 @@ pub fn convert_to_c_safe(s: &String) -> String
 
 // Defines constant strings, get_hash_set function, and contains (pattern match) function
 macro_rules! symbols {
-    [$($value:expr => $name:ident),*] => {
+    [$($value:expr => $name:ident),*,] => {
         $(pub const $name: &str = $value;)*
 
         use std::collections::HashSet;
@@ -86,10 +86,6 @@ macro_rules! symbols {
 pub mod operators
 {
     symbols![
-        "not" => NOT,
-        "ref" => REFERENCE,
-        "mut" => MUTABLE_REFERENCE,
-        "@" => DEREFERENCE,
         "." => ACCESS,
         "=" => ASSIGN,
         "+" => PLUS,
@@ -106,7 +102,13 @@ pub mod operators
         ">=" => GREATER_EQUAL,
         "and" => AND,
         "or" => OR,
-        "xor" => XOR
+        "xor" => XOR,
+        
+        "deref" => DEREFERENCE,
+        "not" => NOT,
+        "ref" => REFERENCE,
+        "mut" => MUTABLE_REFERENCE,
+        "create" => CREATE,
     ];
 
     pub const ACCESS_CHAR: char = '.';
@@ -115,7 +117,7 @@ pub mod operators
     {
         match s.as_str()
         {
-            // ACCESS | ASSIGN | MINUS | TIMES | DIVIDE | MODULO | POW |
+            // ASSIGN | MINUS | TIMES | DIVIDE | MODULO | POW |
             PLUS | EQUAL | NOT_EQUAL | LESS | GREATER | LESS_EQUAL | GREATER_EQUAL | AND | OR
             | XOR => true,
             _ => false,
@@ -126,8 +128,8 @@ pub mod operators
     {
         match s.as_str()
         {
-            // NOT | MINUS | REFERENCE | MUTABLE_REFERENCE | DEREFERENCE => true,
-            REFERENCE | MUTABLE_REFERENCE | DEREFERENCE => true,
+            // NOT | MINUS | REFERENCE | MUTABLE_REFERENCE | DEREFERENCE | CREATE => true,
+            REFERENCE | MUTABLE_REFERENCE | DEREFERENCE | CREATE => true,
             _ => false,
         }
     }
@@ -139,16 +141,24 @@ pub mod keywords
         "fn" => FUNCTION,
         "->" => ARROW,
         "let" => BINDING,
-        "struct" => STRUCT,
+
+        "type" => TYPE,
         "public" => PUBLIC,
         "private" => PRIVATE,
+        "data" => DATA,
+        "is" => IS,
+        "self" => SELF,
+        "read" => READ,
+        "read-write" => WRITE,
+
         "if" => IF,
         "then" => THEN,
         "else" => ELSE,
         "when" => WHEN,
+
         "=>" => ASSOCIATE,
         ":" => ASSOCIATE_TYPE,
-        "#" => COMMENT
+        "#" => COMMENT,
     ];
 
     pub const LINE_COMMENT_CHAR: char = '#';
@@ -163,7 +173,6 @@ pub mod constants
     symbols![
         "true" => TRUE,
         "false" => FALSE,
-        "self" => SELF
     ];
 }
 
@@ -180,7 +189,7 @@ pub mod primitive_data_types
         "float" => FLOAT,
         "void" => VOID,
         "tag" => SHORTSTRING,
-        "string" => LONGSTRING
+        "string" => LONGSTRING,
     ];
 }
 
@@ -208,4 +217,13 @@ pub fn get_hash_set() -> HashSet<String>
     }
 
     return result;
+}
+
+pub mod traits
+{
+    symbols![
+        "PassByValue" => VALUE,
+        "#Copyable" => COPY,
+        "#Numeric" => NUMERIC,
+    ];
 }

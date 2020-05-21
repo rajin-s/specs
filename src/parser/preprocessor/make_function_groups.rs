@@ -158,7 +158,6 @@ fn group_functions(source_bracket_type: BracketType, elements: &mut Vec<SExpress
             _ => false,
         }
     }
-    
     utilities::make_groups(
         3,
         filter_no_arguments_no_return,

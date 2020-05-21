@@ -1,4 +1,11 @@
 #![feature(const_vec_new)]
+#![allow(dead_code)]
+
+#[macro_use]
+extern crate lazy_static;
+
+#[macro_use]
+mod macros;
 
 use std::fs;
 
@@ -9,9 +16,6 @@ mod parser;
 use compiler::*;
 use language::nodes::*;
 use parser::*;
-
-// use type_checker::TypeChecker;
-// use Compiler::Compiler;
 
 fn print_type(node: &Node, _params: &mut ())
 {

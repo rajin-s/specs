@@ -5,11 +5,11 @@ pub fn apply(node: &Node) -> String
 {
     let mut result = String::from("#include \"specs_runtime.h\"\n");
 
-    result.push_str("\n// Function Declarations\n");
+    result.push_str("\n// Declarations\n");
     node.parse_recursive(get_function_declarations, &mut result);
-    result.push_str("\n\n// Function Definitions\n");
+
+    result.push_str("\n\n// Definitions\n");
     node.parse_recursive(get_function_definitions, &mut result);
-    
     result.push_str("\n\n// Program\n");
     result = format!("{}\nint _USER_MAIN(){{ {}; }}", result, get_c(node, 1));
     return result;

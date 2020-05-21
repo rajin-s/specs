@@ -12,6 +12,10 @@
     < > Parsing reference types
     < > Ownership
 
+    < > Array types
+    < > Tuple types
+    < > Struct types
+
     <✔> Extra syntactic "when" block
 >>>
 

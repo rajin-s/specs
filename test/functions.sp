@@ -67,8 +67,8 @@ fn Factorial [n int] -> int
     (Accumulator n 1)
 
     fn Accumulator
-        [n int  ]
-        [acc int]
+        n   : int  
+        acc : int
         -> int
     {
         if n <= 1
@@ -79,15 +79,15 @@ fn Factorial [n int] -> int
     }
 
     fn Multiply
-        [a int  ]
-        [b int  ]
-        [acc int]
+        a   : int  
+        b   : int  
+        acc : int
         -> int
     {
         fn Accumulator
-            [a int  ]
-            [b int  ]
-            [acc int]
+            a   : int  
+            b   : int  
+            acc : int
             -> int
         {
             if b == 0
@@ -107,9 +107,9 @@ fn Fibonacci [n int] -> int
     (Accumulator n 1 1)
 
     fn Accumulator
-        [n    int]
-        [prev int]
-        [acc  int]
+        n    : int
+        prev : int
+        acc  : int
         -> int
     {
         if n == 0
@@ -126,34 +126,20 @@ fn Fibonacci [n int] -> int
 <<< Alternate-style
     argument list >>>
 
-# fn DotProduct
-#     A-x : int
-#     A-y : int
-#     B-x : int
-#     B-y : int
-#     -> int
-# {
-#     (A-x * B-x) + (A-y * B-y)
-# }
+fn DotSum
+    A-x : int
+    A-y : int
+    B-x : int
+    B-y : int
+    -> int
+{
+    (A-x + B-x) + (A-y + B-y)
+}
 
-# (DotProduct
-#     1 4
-#     5 2)
-
-# if (Is-Even 5) then
-# {
-#     (Add-100 (Get-100))
-
-#     fn Add-100 [x int] -> int { x + 100 }
-#     fn Get-100 -> int { 100 }
-# }
-# else
-# {
-#     fn Add-100 [x int] -> int { x + 50 + 50 }
-#     fn Get-100 -> int { (Add-100 0) }
-
-#     (Add-100 (Get-100))
-# }
+(DotSum 1 4
+        5 2)
+(DotSum (DotSum 1 2 3 4) (DotSum 5 6 7 8)
+        (DotSum 9 10 11 12) (DotSum 13 14 15 16))
 
 <<<
 <<< Function pointers

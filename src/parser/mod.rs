@@ -24,11 +24,16 @@ impl Parser
     // Preprocess an S-Expression for parsing
     pub fn preprocess(&self, source: &mut SExpression)
     {
+        preprocessor::make_associative_groups::apply(source);
         preprocessor::make_function_groups::apply(source);
+        preprocessor::make_type_groups::apply(source);
+
         preprocessor::make_operator_groups::apply(source);
         preprocessor::make_conditional_groups::apply(source);
         preprocessor::make_when_groups::apply(source);
         preprocessor::make_assign_groups::apply(source);
+
+        preprocessor::expand_operator_chains::apply(source);
     }
 
     // Parse a source S-Expression into a ParseResult (node or errors)

@@ -298,6 +298,38 @@ fn extract_sequences(node: &mut Node, temp_names: &mut TempNameGenerator)
         {
             // Functions don't need to change
         }
+
+        Node::Type(_data) =>
+        {
+            // Types don't need to change
+        }
+        Node::Access(data) =>
+        {
+            /* Access
+                ({... a} . property)
+                =>
+                {
+                    let temp = Nothing
+                    {... (temp = a)}
+                    (temp . property)
+                }
+            */
+    
+            if let Node::Sequence(_) = data.get_target()
+            {
+                fn get_target(node: &mut Node) -> &mut Node
+                {
+                    if let Node::Access(data) = node
+                    {
+                        return data.get_target_mut();
+                    }
+    
+                    unreachable!();
+                }
+    
+                lift_sequence(node, get_target, temp_names);
+            }
+        }
     }
 }
 

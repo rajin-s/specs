@@ -94,6 +94,15 @@ fn convert_leaves(node: &mut Node, is_return_context: &mut bool)
             let mut body_is_return_context = true;
             convert_leaves(data.get_body_mut(), &mut body_is_return_context);
         }
+        Node::Type(data) =>
+        {
+            for method in data.get_methods_mut().iter_mut()
+            {
+                let mut body_is_return_context = true;
+                let function_data = method.get_function_data_mut();
+                convert_leaves(function_data.get_body_mut(), &mut body_is_return_context);
+            }
+        }
         node =>
         {
             let mut is_return_context = false;

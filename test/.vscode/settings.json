@@ -1,0 +1,10 @@
+{
+    "files.associations": {
+        "*.shader": "hlsl",
+        "*.pad": "python",
+        "SConstruct": "python",
+        "*.putt": "json",
+        "*.rml": "rust",
+        "specs_runtime.h": "c"
+    }
+}

@@ -1,24 +1,19 @@
 #include "stdio.h"
+#include "stdlib.h"
 
 typedef int bool;
 #define true 1
 #define false 0
 
-int _USER_MAIN();
+int _specs__UserMain();
 
 int main( int argc, char** argv )
 {
-    int result = _USER_MAIN();
+    int result = _specs__UserMain();
     printf( "out: %d\n", result );
 }
 
-int FOO(int a, int b)
+void* _specs__Allocate(size_t size)
 {
-    printf("Call FOO\n");
-    return a + b;
-}
-int BAR(int a, int b)
-{
-    printf("Call BAR\n");
-    return a | b;
+    return malloc(size);
 }

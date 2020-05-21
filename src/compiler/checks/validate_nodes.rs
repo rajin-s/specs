@@ -12,6 +12,8 @@ pub enum NodeError
     InvalidRHS(String),
     EmptySequence,
     InvalidCondition(String),
+    InvalidBlock(String),
+    InvalidAccessTarget(String),
 }
 type NodeErrors = Vec<NodeError>;
 
@@ -53,6 +55,42 @@ fn is_atomic(node: &Node) -> bool
 // Check that a nodes structural constraints are met
 fn check_node(node: &Node) -> Option<NodeErrors>
 {
+    macro_rules! check {
+        ($target:expr, pass : [$( $pass:path ),*,], error : $error:path) => {
+            match $target
+            {
+                Node::Nothing => Some($error(format!("{}", $target))),
+                $( $pass(_) => None, )*
+                _ => Some($error(format!("{}", $target))),
+            }
+        };
+        ($target:expr, block : [$( $block:path ),*,], error : $error:path) => {
+            match $target
+            {
+                Node::Nothing => Some($error(format!("{}", $target))),
+                $( $block(_) => Some($error(format!("{}", $target))), )*
+                _ => None,
+            }
+        };
+        ($target:expr, allow_nothing, pass : [$( $pass:path ),*,], error : $error:path) => {
+            match $target
+            {
+                Node::Nothing => None,
+                $( $pass(_) => None, )*
+                _ => Some($error(format!("{}", $target))),
+            }
+        };
+        ($target:expr, allow_nothing, block : [$( $block:path ),*,], error : $error:path) => {
+            match $target
+            {
+                Node::Nothing => None,
+                $( $block(_) => Some($error(format!("{}", $target))), )*
+                _ => None,
+            }
+        };
+    }
+
+    use Node::*;
     match node
     {
         Node::Nothing | Node::Integer(_) | Node::Boolean(_) | Node::Variable(_) =>
@@ -62,47 +100,37 @@ fn check_node(node: &Node) -> Option<NodeErrors>
 
         Node::Call(data) =>
         {
-            // Operator can be
-            //  - Variable
-            //  - Call
-            //  - PrimitiveOperator
-            //  - Dereference
-            //  - Conditional
-            let operator_error = match data.get_operator()
-            {
-                Node::Variable(_)
-                | Node::Call(_)
-                | Node::PrimitiveOperator(_)
-                | Node::Dereference(_)
-                | Node::Conditional(_) => None,
-                _ => Some(NodeError::InvalidOperator(format!(
-                    "{}",
-                    data.get_operator()
-                ))),
-            };
+            let operator_error = check!(
+                data.get_operator(),
+                block : [
+                    Integer,
+                    Boolean,
+                    Reference,
+                    Binding,
+                    Assignment,
+                    Type,
+                ],
+                error : NodeError::InvalidOperator
+            );
 
-            // Operands can be
-            //  - Any atomic
-            //  - Call
-            //  - Reference / Dereference
-            //  - Conditional
             let mut operand_errors: NodeErrors = NodeErrors::new();
             for operand in data.get_operands().iter()
             {
-                let operand_errors = match operand
+                let operand_error = check!(
+                    operand,
+                    block : [
+                        PrimitiveOperator,
+                        Binding,
+                        Assignment,
+                        Type,
+                    ],
+                    error : NodeError::InvalidOperand
+                );
+
+                if let Some(new_error) = operand_error
                 {
-                    Node::Call(_)
-                    | Node::Reference(_)
-                    | Node::Dereference(_)
-                    | Node::Conditional(_) =>
-                    {}
-                    n if is_atomic(n) =>
-                    {}
-                    _ =>
-                    {
-                        operand_errors.push(NodeError::InvalidOperand(format!("{}", operand)));
-                    }
-                };
+                    operand_errors.push(new_error);
+                }
             }
 
             match (operator_error, operand_errors.is_empty())
@@ -125,18 +153,17 @@ fn check_node(node: &Node) -> Option<NodeErrors>
 
         Node::Reference(data) =>
         {
-            // Target can be
-            //  - Variable
-            //  - Dereference
-            //  - Conditional
-            let target_error = match data.get_target()
-            {
-                Node::Variable(_) | Node::Dereference(_) | Node::Conditional(_) => None,
-                _ => Some(NodeError::InvalidReference(format!(
-                    "{}",
-                    data.get_target()
-                ))),
-            };
+            let target_error = check!(
+                data.get_target(),
+                pass : [
+                    Variable,
+                    Dereference,
+                    Sequence,
+                    Conditional,
+                    Access,
+                ],
+                error : NodeError::InvalidReference
+            );
 
             match target_error
             {
@@ -146,24 +173,19 @@ fn check_node(node: &Node) -> Option<NodeErrors>
         }
         Node::Dereference(data) =>
         {
-            // Target can be
-            //  - Variable
-            //  - Call
-            //  - Reference
-            //  - Dereference
-            //  - Conditional
-            let target_error = match data.get_target()
-            {
-                Node::Variable(_)
-                | Node::Call(_)
-                | Node::Reference(_)
-                | Node::Dereference(_)
-                | Node::Conditional(_) => None,
-                _ => Some(NodeError::InvalidDereference(format!(
-                    "{}",
-                    data.get_target()
-                ))),
-            };
+            let target_error = check!(
+                data.get_target(),
+                pass : [
+                    Variable,
+                    Call,
+                    Reference,
+                    Dereference,
+                    Sequence,
+                    Conditional,
+                    Access,
+                ],
+                error : NodeError::InvalidDereference
+            );
 
             match target_error
             {
@@ -174,23 +196,16 @@ fn check_node(node: &Node) -> Option<NodeErrors>
 
         Node::Binding(data) =>
         {
-            // Binding can be
-            //  - Nothing (for bindings introduced by passes)
-            //  - Any atomic
-            //  - Call
-            //  - Reference
-            //  - Dereference
-            //  - Conditional
-            let binding_error = match data.get_binding()
-            {
-                Node::Nothing
-                | Node::Call(_)
-                | Node::Reference(_)
-                | Node::Dereference(_)
-                | Node::Conditional(_) => None,
-                n if is_atomic(n) => None,
-                _ => Some(NodeError::InvalidBinding(format!("{}", data.get_binding()))),
-            };
+            let binding_error = check!(
+                data.get_binding(),
+                block : [
+                    PrimitiveOperator,
+                    Binding,
+                    Assignment,
+                    Type,
+                ],
+                error : NodeError::InvalidBinding
+            );
 
             match binding_error
             {
@@ -200,31 +215,27 @@ fn check_node(node: &Node) -> Option<NodeErrors>
         }
         Node::Assignment(data) =>
         {
-            // LHS can be
-            //  - Variable
-            //  - Dereference
-            //  - Conditional
-            let lhs_error = match data.get_lhs()
-            {
-                Node::Variable(_) | Node::Dereference(_) | Node::Conditional(_) => None,
-                _ => Some(NodeError::InvalidLHS(format!("{}", data.get_lhs()))),
-            };
+            let lhs_error = check!(
+                data.get_lhs(),
+                pass : [
+                    Variable,
+                    Dereference,
+                    Conditional,
+                    Access,
+                ],
+                error : NodeError::InvalidLHS
+            );
 
-            // RHS can be
-            //  - Any atomic
-            //  - Call
-            //  - Reference
-            //  - Dereference
-            //  - Conditional
-            let rhs_error = match data.get_rhs()
-            {
-                Node::Call(_)
-                | Node::Reference(_)
-                | Node::Dereference(_)
-                | Node::Conditional(_) => None,
-                n if is_atomic(n) => None,
-                _ => Some(NodeError::InvalidRHS(format!("{}", data.get_rhs()))),
-            };
+            let rhs_error = check!(
+                data.get_rhs(),
+                block : [
+                    PrimitiveOperator,
+                    Binding,
+                    Assignment,
+                    Type,
+                ],
+                error : NodeError::InvalidBinding
+            );
 
             match (lhs_error, rhs_error)
             {
@@ -253,37 +264,126 @@ fn check_node(node: &Node) -> Option<NodeErrors>
         }
         Node::Conditional(data) =>
         {
-            // Condition can be
-            //  - Any atomic
-            //  - Call
-            //  - Dereference
-            //  - Conditional
-            let condition_error = match data.get_condition()
-            {
-                Node::Call(_) | Node::Dereference(_) | Node::Conditional(_) => None,
-                n if is_atomic(n) => None,
-                _ => Some(NodeError::InvalidCondition(format!(
-                    "{}",
-                    data.get_condition()
-                ))),
-            };
+            let condition_error = check!(
+                data.get_condition(),
+                pass : [
+                    Boolean,
+                    Variable,
+                    Call,
+                    Dereference,
+                    Sequence,
+                    Conditional,
+                    Access,
+                ],
+                error : NodeError::InvalidCondition
+            );
 
-            // Then can be
-            //  - Anything
-            // Else can be
-            //  - Anything
-            match condition_error
+            let then_error = check!(
+                data.get_then(),
+                block : [
+                    Type,
+                ],
+                error : NodeError::InvalidBlock
+            );
+
+            let else_error = check!(
+                data.get_else(),
+                allow_nothing,
+                block : [
+                    Type,
+                ],
+                error : NodeError::InvalidBlock
+            );
+
+            match (&condition_error, &then_error, &else_error)
+            {
+                (None, None, None) => None,
+                _ =>
+                {
+                    let mut errors: Vec<NodeError> = Vec::new();
+                    if let Some(error) = condition_error
+                    {
+                        errors.push(error);
+                    }
+                    if let Some(error) = then_error
+                    {
+                        errors.push(error);
+                    }
+                    if let Some(error) = else_error
+                    {
+                        errors.push(error);
+                    }
+
+                    Some(errors)
+                }
+            }
+        }
+
+        Node::Function(data) =>
+        {
+            let body_error = check!(
+                data.get_body(),
+                block : [
+                    Type,
+                ],
+                error : NodeError::InvalidBlock
+            );
+
+            match body_error
             {
                 None => None,
                 Some(error) => Some(vec![error]),
             }
         }
 
-        Node::Function(_data) =>
+        Node::Type(data) =>
         {
-            // Function body can be
-            //  - Anything
-            None
+            let mut method_body_errors: Vec<NodeError> = Vec::new();
+
+            for method in data.get_methods().iter()
+            {
+                let body_error = check!(
+                    method.get_function_data().get_body(),
+                    block : [
+                        Type,
+                    ],
+                    error : NodeError::InvalidBlock
+                );
+
+                if let Some(error) = body_error
+                {
+                    method_body_errors.push(error);
+                }
+            }
+
+            if method_body_errors.is_empty()
+            {
+                None
+            }
+            else
+            {
+                Some(method_body_errors)
+            }
+        }
+        Node::Access(data) =>
+        {
+            let target_error = check!(
+                data.get_target(),
+                block : [
+                    PrimitiveOperator,
+                    Binding,
+                    Assignment,
+                    Function,
+                    Type,
+                ],
+                error : NodeError::InvalidAccessTarget
+            );
+
+            match target_error
+            {
+                None => None,
+                Some(error) => Some(vec![error]),
+            }
         }
     }
 }
@@ -311,6 +411,11 @@ impl fmt::Display for NodeError
             NodeError::InvalidCondition(message) =>
             {
                 write!(f, "Invalid branch condition: {}", message)
+            }
+            NodeError::InvalidBlock(message) => write!(f, "Invalid block: {}", message),
+            NodeError::InvalidAccessTarget(message) =>
+            {
+                write!(f, "Invalid access target: {}", message)
             }
         }
     }

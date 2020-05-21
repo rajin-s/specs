@@ -44,6 +44,10 @@ pub fn apply(expression: &mut SExpression)
             );
             group_binary_operators(make_filter![AND, OR, XOR], *source_bracket_type, elements);
 
+            // Other operators
+            // Should this be allowed?
+            // group_binary_operators(make_filter![ACCESS], *source_bracket_type, elements);
+
             // Then traverse child lists
             for element in elements.iter_mut()
             {
