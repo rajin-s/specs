@@ -9,3 +9,7 @@ if a and c and d and (e == d) then
 {
     a
 }
+else
+{
+    if b then b else c =/= d
+}
