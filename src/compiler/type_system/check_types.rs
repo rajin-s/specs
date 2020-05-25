@@ -137,7 +137,7 @@ fn check_type(node: &Node, errors: &mut TypeErrors)
         Node::Conditional(data) =>
         {
             let condition_type = data.get_condition().get_type();
-            if !(condition_type.is_value() && condition_type.data_type_is(DataType::Boolean))
+            if !condition_type.is_value_of_type(DataType::Boolean)
             {
                 new_errors.push(TypeError::InvalidConditionType(
                     data.get_condition().get_type().clone(),

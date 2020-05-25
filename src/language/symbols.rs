@@ -88,6 +88,7 @@ pub mod operators
     symbols![
         "." => ACCESS,
         "=" => ASSIGN,
+        "=" => BINDING_ASSIGN,
         "+" => PLUS,
         "-" => MINUS,
         "*" => TIMES,
@@ -140,12 +141,13 @@ pub mod keywords
     symbols![
         "fn" => FUNCTION,
         "->" => ARROW,
+        "->" => RETURNS,
         "let" => BINDING,
 
         "type" => TYPE,
         "public" => PUBLIC,
         "private" => PRIVATE,
-        "data" => DATA,
+        "data" => TYPE_DATA,
         "is" => IS,
         "self" => SELF,
         "read" => READ,

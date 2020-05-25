@@ -1,27 +1,25 @@
-pub mod errors;
-pub use errors::*;
-
 pub mod s_expression;
 use s_expression::*;
 
 mod parse_s_expression;
 mod preprocessor;
-mod parse_node;
+mod parse;
 
-use crate::language::nodes::*;
-
-pub type ParseResult = Result<Node, ParseErrorList>;
+use crate::language::nodes::Node;
 
 pub struct Parser {}
 impl Parser
 {
-    // Parse a source string into an S-Expression
+    pub fn new() -> Self
+    {
+        return Self {};
+    }
+
     pub fn parse_source(&self, source: &String) -> Option<SExpression>
     {
         return parse_s_expression::parse_expression(source);
     }
 
-    // Preprocess an S-Expression for parsing
     pub fn preprocess(&self, source: &mut SExpression)
     {
         preprocessor::make_associative_groups::apply(source);
@@ -36,45 +34,23 @@ impl Parser
         preprocessor::expand_operator_chains::apply(source);
     }
 
-    // Parse a source S-Expression into a ParseResult (node or errors)
-    pub fn parse(&self, source: &SExpression) -> ParseResult
+    pub fn parse_expression(&self, source: &SExpression) -> ParseResult
     {
-        let mut nodes: Vec<Node> = Vec::new();
-        let mut errors = ParseErrorList::new();
+        let mut context = parse::Context::new();
 
-        // All programs are wrapped in a top-level list (not user-defined)
-        if let SExpression::List(BracketType::None, elements) = source
-        {
-            // Accumulate nodes and/or errors
-            for element in elements.iter()
-            {
-                match parse_node::parse_node_recursive(element)
-                {
-                    Ok(node) => nodes.push(node),
-                    Err(mut new_errors) => errors.append(&mut new_errors),
-                }
-            }
+        let result = parse::parse_root_expression(source, &mut context);
+        let (errors, warnings) = context.get_messages();
 
-            if errors.len() == 0
-            {
-                return Ok(SequenceNodeData::new(nodes).to_node());
-            }
-            else
-            {
-                return Err(errors);
-            }
-        }
-        else
+        match result
         {
-            errors.push(ParseError::Internal(String::from(
-                "Invalid top-level SExpression",
-            )));
-            return Err(errors);
+            Some(node) => ParseResult::Success(node, warnings),
+            None => ParseResult::Error(errors, warnings),
         }
     }
+}
 
-    pub fn new() -> Self
-    {
-        return Self {};
-    }
+pub enum ParseResult
+{
+    Success(Node, Vec<parse::Message>),
+    Error(Vec<parse::Message>, Vec<parse::Message>),
 }

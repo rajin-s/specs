@@ -35,7 +35,9 @@ fn group_conditionals(source_bracket_type: BracketType, elements: &mut Vec<SExpr
 
     let same_bracket = source_bracket_type == BracketType::Round;
 
-    // note: This function assumes IF_THEN_SIZE < IF_ELSE_SIZE
+    // if A then B
+    // if A then B else C
+    //  note: Assumes IF_THEN_SIZE < IF_ELSE_SIZE
     const IF_ELSE_SIZE: usize = 6;
     const IF_THEN_SIZE: usize = 4;
 
@@ -87,10 +89,10 @@ fn group_conditionals(source_bracket_type: BracketType, elements: &mut Vec<SExpr
                         //  (... if a then b else c ...) => (... (if a then b else c) <> <> <> <> <> ...)
                         // note: place the group at the *front* of the original slice so it can be used as part of the next group
                         utilities::group_front(IF_ELSE_SIZE, BracketType::Round, slice);
-
-                        // x y z a b c => x y z (a b c) <> <>
-                        //       ^          .<--^
-                        skip_count = IF_ELSE_SIZE - 2;
+                        
+                        // (<if> <...> <then> (if a then b else c) <> <> <> <> <> ...)
+                        //  . <---------------^
+                        skip_count = 2;
                         empty_count += IF_ELSE_SIZE - 1;
                     }
                     // if ... then ... ... ...
@@ -102,7 +104,7 @@ fn group_conditionals(source_bracket_type: BracketType, elements: &mut Vec<SExpr
                         // note: place the group at the *front* of the original slice so it can be used as part of the next group
                         let if_then_slice = &mut slice[0..IF_THEN_SIZE];
                         utilities::group_front(IF_THEN_SIZE, BracketType::Round, if_then_slice);
-                        skip_count = IF_THEN_SIZE - 2;
+                        skip_count = 2;
                         empty_count += IF_THEN_SIZE - 1;
                     }
                     _ =>
@@ -128,7 +130,7 @@ fn group_conditionals(source_bracket_type: BracketType, elements: &mut Vec<SExpr
                             }
 
                             utilities::group_front(IF_THEN_SIZE, BracketType::Round, slice);
-                            skip_count = IF_THEN_SIZE - 2;
+                            skip_count = 2;
                             empty_count += IF_THEN_SIZE - 1;
                         }
                         _ =>

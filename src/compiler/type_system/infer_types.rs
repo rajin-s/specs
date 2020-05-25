@@ -417,7 +417,7 @@ fn build_definition_types(node: &mut Node, params: &mut ())
             // Add all traits
             for trait_data in data.get_traits().iter()
             {
-                type_data.add_trait(trait_data.get_name().clone());
+                // type_data.add_trait(trait_data.get_name().clone());
             }
 
             data.set_type(Type::from(type_data));

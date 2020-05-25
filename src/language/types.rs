@@ -1,5 +1,7 @@
-use crate::language::symbols;
+use std::cell::Ref;
 use std::collections::{HashMap, HashSet};
+
+pub use super::traits::*;
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum Reference
@@ -8,9 +10,7 @@ pub enum Reference
     Mutable,
 }
 
-pub type TraitSet = HashSet<String>;
-
-#[derive(Clone, PartialEq, Debug)]
+#[derive(Clone, PartialEq)]
 pub struct Type
 {
     data_type:        DataType,
@@ -19,7 +19,6 @@ pub struct Type
 impl Type
 {
     get!(data_type : get_data_type -> &DataType);
-    // get!(traits : get_traits -> &Option<TraitSet>);
     get!(reference_layers : get_reference_layers -> &Vec<Reference>);
 
     pub fn set_data_type(&mut self, new_data_type: DataType)
@@ -50,17 +49,21 @@ impl Type
     }
 
     // Check data type qualities
-    pub fn data_type_is(&self, data_type: DataType) -> bool
-    {
-        return self.data_type == data_type;
-    }
     pub fn is_unknown(&self) -> bool
     {
-        return self.data_type == DataType::Unknown;
+        match self.data_type
+        {
+            DataType::Unknown => true,
+            _ => false,
+        }
     }
     pub fn is_void(&self) -> bool
     {
-        return self.data_type == DataType::Void;
+        match self.data_type
+        {
+            DataType::Void => true,
+            _ => false,
+        }
     }
     pub fn is_callable(&self) -> bool
     {
@@ -69,6 +72,10 @@ impl Type
             (DataType::Function(_), true) => true,
             _ => false,
         }
+    }
+    pub fn is_value_of_type(&self, data_type: DataType) -> bool
+    {
+        return self.is_value() && self.data_type == data_type;
     }
 
     // Reference / Dereference
@@ -96,16 +103,22 @@ impl Type
     }
 
     // Create a new type
-    pub fn new(
-        data_type: DataType,
-        reference_layers: Vec<Reference>,
-    ) -> Self
+    pub fn new(data_type: DataType, reference_layers: Vec<Reference>) -> Self
     {
         return Self {
             data_type:        data_type,
             reference_layers: reference_layers,
         };
     }
+    // Create a new type
+    pub fn new_instance(name: String) -> Self
+    {
+        return Self {
+            data_type:        DataType::Instance(InstanceTypeData::new(name)),
+            reference_layers: vec![],
+        };
+    }
+
     pub fn unknown() -> Type
     {
         return basic_types::unknown().clone();
@@ -127,7 +140,7 @@ pub trait ToType
 /*                                 Data Types                                 */
 /* -------------------------------------------------------------------------- */
 
-#[derive(Clone, PartialEq, Debug)]
+#[derive(Clone, PartialEq)]
 pub enum DataType
 {
     Unknown,
@@ -153,7 +166,7 @@ pub enum FunctionType
     StaticMethod,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, PartialEq, Debug)]
 pub struct FunctionMetadata
 {
     function_type: FunctionType,
@@ -174,7 +187,7 @@ impl FunctionMetadata
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, PartialEq)]
 pub struct FunctionTypeData
 {
     argument_types: Vec<Type>,
@@ -210,44 +223,24 @@ impl ToType for FunctionTypeData
         return Type::new(DataType::Function(self), vec![]);
     }
 }
-impl PartialEq for FunctionTypeData
-{
-    fn eq(&self, other: &Self) -> bool
-    {
-        if self.argument_types.len() != other.argument_types.len()
-        {
-            return false;
-        }
-
-        for i in 0..self.argument_types.len()
-        {
-            if self.argument_types[i] != other.argument_types[i]
-            {
-                return false;
-            }
-        }
-
-        return self.get_return_type() == other.get_return_type();
-    }
-}
 
 /* -------------------------------------------------------------------------- */
 /*                                 Structures                                 */
 /* -------------------------------------------------------------------------- */
 
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum Visibility
 {
     Private,
     Public,
 }
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum MemberScope
 {
     Static,
     Instance,
 }
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, PartialEq)]
 pub struct TypeMemberData
 {
     member_type: Box<Type>,
@@ -255,13 +248,13 @@ pub struct TypeMemberData
     scope:       MemberScope,
 }
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, PartialEq)]
 pub struct TypeTypeData
 {
     name:    String,
     members: HashMap<String, Type>,
 
-    traits: HashSet<String>,
+    traits: TraitSet,
 
     instance_members: HashSet<String>,
     static_members:   HashSet<String>,
@@ -272,7 +265,27 @@ pub struct TypeTypeData
 impl TypeTypeData
 {
     get!(name : get_name -> &String);
+    get!(traits : get_traits -> &TraitSet);
+    get!(traits : get_traits_mut -> &mut TraitSet);
 
+    pub fn new_empty(name: String) -> Self
+    {
+        return Self {
+            name:    name,
+            members: HashMap::new(),
+
+            traits: TraitSet::new_empty(),
+
+            static_members:   HashSet::new(),
+            instance_members: HashSet::new(),
+
+            publicly_readable_members: HashSet::new(),
+            publicly_writable_members: HashSet::new(),
+        };
+    }
+
+
+    // Members
     pub fn add_member(
         &mut self,
         name: String,
@@ -306,11 +319,6 @@ impl TypeTypeData
 
         self.members.insert(name, member_type);
     }
-    pub fn add_trait(&mut self, name: String)
-    {
-        self.traits.insert(name);
-    }
-
     pub fn get_member_type(&self, name: &String) -> Option<&Type>
     {
         return self.members.get(name);
@@ -324,6 +332,7 @@ impl TypeTypeData
         return self.static_members.contains(name);
     }
 
+    // Instances
     pub fn get_instance_type(&self) -> Type
     {
         return Type::new(
@@ -331,33 +340,17 @@ impl TypeTypeData
             vec![],
         );
     }
-
-    pub fn new_empty(name: String) -> Self
-    {
-        return Self {
-            name:    name,
-            members: HashMap::new(),
-
-            traits: HashSet::new(),
-
-            static_members:   HashSet::new(),
-            instance_members: HashSet::new(),
-
-            publicly_readable_members: HashSet::new(),
-            publicly_writable_members: HashSet::new(),
-        };
-    }
 }
 impl ToType for TypeTypeData
 {
     fn to_type(self) -> Type
     {
-        let type_traits = self.traits.clone();
+        // let type_traits = self.traits.clone();
         return Type::new(DataType::Type(self), vec![]);
     }
 }
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, PartialEq)]
 pub struct InstanceTypeData
 {
     name: String,
@@ -398,7 +391,6 @@ pub trait TypedInferred: Typed
 pub mod basic_types
 {
     use super::*;
-
     pub fn unknown() -> &'static Type
     {
         lazy_static! {
@@ -416,20 +408,14 @@ pub mod basic_types
     pub fn integer() -> &'static Type
     {
         lazy_static! {
-            static ref T: Type = Type::new(
-                DataType::Integer,
-                vec![]
-            );
+            static ref T: Type = Type::new(DataType::Integer, vec![]);
         }
         return &T;
     }
     pub fn boolean() -> &'static Type
     {
         lazy_static! {
-            static ref T: Type = Type::new(
-                DataType::Boolean,
-                vec![]
-            );
+            static ref T: Type = Type::new(DataType::Boolean, vec![]);
         }
         return &T;
     }

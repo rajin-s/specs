@@ -17,7 +17,7 @@ pub fn parse_expression(source: &String) -> Option<SExpression>
     let stripped = strip_comments(source.as_str());
 
     // Create the parse tree root
-    let mut parse_root = ParseNode::Unparsed(BracketType::None, stripped.as_str());
+    let mut parse_root = ParseNode::Unparsed(BracketType::Curly, stripped.as_str());
 
     // Expand and traverse the parse tree in breadth-first order
     let mut parse_queue = NodeQueue::new();

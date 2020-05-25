@@ -1,4 +1,4 @@
-#![feature(const_vec_new)]
+#![feature(const_vec_new, get_mut_unchecked)]
 #![allow(dead_code)]
 
 #[macro_use]
@@ -35,6 +35,14 @@ fn main()
     {
         String::from("main.sp")
     };
+    let output_path = if let Some(path) = args.next()
+    {
+        path
+    }
+    else
+    {
+        input_path.replace(".sp", ".c")
+    };
 
     if let Ok(source) = fs::read_to_string(&input_path)
     {
@@ -52,10 +60,17 @@ fn main()
             println!("Preprocessor Result:");
             println!("\t{}\n", &s_expression);
 
-            match parser.parse(&s_expression)
+            match parser.parse_expression(&s_expression)
             {
-                Ok(node) =>
+                ParseResult::Success(node, warnings) =>
                 {
+                    println!("Parse Succeeded");
+                    println!("Warnings:");
+                    for warning in warnings.iter()
+                    {
+                        println!("Parse warning: {}", warning);
+                    }
+                    
                     println!("Parse Result:");
                     println!("\t{}\n", &node);
 
@@ -71,12 +86,19 @@ fn main()
                     {
                         println!("C output:\n");
                         println!("{}", c_string);
-                        fs::write(input_path.replace(".sp", ".c"), c_string);
+                        let _ = fs::write(output_path, c_string);
                     }
                 }
-                Err(errors) =>
+                ParseResult::Error(errors, warnings) =>
                 {
-                    for error in errors.iter()
+                    println!("Parse Failed");
+                    println!("Warnings:");
+                    for warning in warnings.iter()
+                    {
+                        println!("Parse warning: {}", warning);
+                    }
+                    println!("Errors:");
+                    for error in errors.iter().rev()
                     {
                         println!("Parse error: {}", error);
                     }

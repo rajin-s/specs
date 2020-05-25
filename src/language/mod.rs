@@ -2,8 +2,9 @@ pub mod symbols;
 pub mod runtime;
 pub mod primitives;
 
-pub mod types;
 pub mod nodes;
+pub mod types;
+pub mod traits;
 
 mod display;
 

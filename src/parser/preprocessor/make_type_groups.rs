@@ -51,7 +51,7 @@ fn group_regions(source_bracket_type: BracketType, elements: &mut Vec<SExpressio
         {
             // (data|private|public) { ... }
             [Symbol(region_keyword), List(BracketType::Curly, _content)]
-                if region_keyword == symbols::keywords::DATA
+                if region_keyword == symbols::keywords::TYPE_DATA
                     || region_keyword == symbols::keywords::PUBLIC
                     || region_keyword == symbols::keywords::PRIVATE =>
             {
@@ -114,7 +114,7 @@ fn group_traits(source_bracket_type: BracketType, elements: &mut Vec<SExpression
         3,
         filter_trait_block,
         source_bracket_type,
-        BracketType::Round,
+        BracketType::None,
         elements,
     );
     utilities::make_groups_exclude(
@@ -122,7 +122,7 @@ fn group_traits(source_bracket_type: BracketType, elements: &mut Vec<SExpression
         filter_trait,
         exclude_trait_block,
         source_bracket_type,
-        BracketType::Round,
+        BracketType::None,
         elements,
     );
 }

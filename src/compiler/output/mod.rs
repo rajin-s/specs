@@ -7,7 +7,7 @@ pub fn get_c_string(root: &Node) -> String
 {
     let mut result = String::new();
 
-    result.push_str("#include \"specs_runtime.h\"\n");
+    result.push_str("#include \"specs_runtime.h\"");
 
     fn write_header(result: &mut String, header: &str)
     {
@@ -20,17 +20,33 @@ pub fn get_c_string(root: &Node) -> String
         *result = format!("{}{}\n", result, content);
     }
 
-    write_header(&mut result, "Type Declarations");
-    write(&mut result, format_node::get_types(root, true));
+    let type_declarations = format_node::get_types(root, true);
+    if !type_declarations.is_empty()
+    {
+        write_header(&mut result, "Type Declarations");
+        write(&mut result, type_declarations);
+    }
 
-    write_header(&mut result, "Type Definitions");
-    write(&mut result, format_node::get_types(root, false));
+    let type_definitions = format_node::get_types(root, false);
+    if !type_definitions.is_empty()
+    {
+        write_header(&mut result, "Type Definitions");
+        write(&mut result, type_definitions);
+    }
 
-    write_header(&mut result, "Function Declarations");
-    write(&mut result, format_node::get_functions(root, true));
+    let function_declarations = format_node::get_functions(root, true);
+    if !function_declarations.is_empty()
+    {
+        write_header(&mut result, "Function Declarations");
+        write(&mut result, function_declarations);
+    }
     
-    write_header(&mut result, "Function Definitions");
-    write(&mut result, format_node::get_functions(root, false));
+    let function_definitions = format_node::get_functions(root, false);
+    if !function_definitions.is_empty()
+    {
+        write_header(&mut result, "Function Definitions");
+        write(&mut result, function_definitions);
+    }
     
     write_header(&mut result, "Program Body");
 

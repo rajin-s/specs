@@ -7,6 +7,8 @@ mod type_system;
 
 mod utilities;
 
+mod internal;
+
 #[derive(Clone, Copy, Debug)]
 pub struct CompilerOptions
 {

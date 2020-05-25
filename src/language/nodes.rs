@@ -951,6 +951,16 @@ impl TypeNodeData
         self.name = name;
     }
 
+    pub fn new(name: String, members: Vec<MemberData>, methods: Vec<MethodData>, traits: Vec<TraitData>) -> Self
+    {
+        return Self {
+            name:      name,
+            members:   members,
+            methods:   methods,
+            traits:    Vec::new(),
+            node_type: Type::unknown(),
+        };
+    }
     pub fn new_empty(name: String) -> Self
     {
         return Self {

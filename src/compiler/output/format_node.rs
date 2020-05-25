@@ -1,25 +1,5 @@
-use super::super::utilities::TempNameGenerator;
 use super::*;
 use crate::language::symbols;
-
-// pub fn apply(node: &Node) -> (String, String, String)
-// {
-//     let mut program_string = String::new();
-//     let mut program_context = FormatContext::new(&mut program_string);
-
-//     let mut declaration_string = String::new();
-//     let mut declaration_context = FormatContext::new(&mut declaration_string);
-//     declaration_context.declaration_mode = true;
-
-//     let mut definition_string = String::new();
-//     let mut definition_context = FormatContext::new(&mut definition_string);
-
-//     parse_node(node, &mut program_context);
-//     parse_function_definitions(node, &mut declaration_context);
-//     parse_function_definitions(node, &mut definition_context);
-
-//     return (declaration_string, definition_string, program_string);
-// }
 
 pub fn get_functions(node: &Node, declarations_only: bool) -> String
 {
