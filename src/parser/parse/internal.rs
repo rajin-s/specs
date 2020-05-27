@@ -1,7 +1,10 @@
 use std::collections::VecDeque;
 use std::rc::Rc;
 
-use crate::language::nodes::*;
+use crate::language::*;
+use node::*;
+use types::*;
+
 use crate::s_expression::*;
 
 use super::parse_node;
@@ -16,7 +19,8 @@ pub mod imports
     pub use SExpression::*;
 
     pub use super::super::Context;
-    pub use crate::language::nodes::*;
+    pub use crate::language::node::*;
+    pub use crate::language::types::*;
     pub use crate::language::symbols::*;
 }
 
@@ -74,12 +78,12 @@ pub enum PartialNodeData<'a>
 
     Call(ParseItemReference<'a>, Vec<ParseItemReference<'a>>),
 
-    Reference(Reference, ParseItemReference<'a>),
+    Reference(ReferenceMode, ParseItemReference<'a>),
     Dereference(ParseItemReference<'a>),
 
     Binding(String, ParseItemReference<'a>),
     Assignment(ParseItemReference<'a>, ParseItemReference<'a>),
-    Sequence(bool, Vec<ParseItemReference<'a>>),
+    Sequence(control::SequenceMode, Vec<ParseItemReference<'a>>),
     Conditional(
         ParseItemReference<'a>,
         ParseItemReference<'a>,

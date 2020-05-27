@@ -43,12 +43,12 @@ fn infer_type(node: &mut Node, environment: &mut TypeEnvironment)
                 match operator_data.get_operator()
                 {
                     // compare : (T T) -> bool
-                    PrimitiveOperator::Equal
-                    | PrimitiveOperator::NotEqual
-                    | PrimitiveOperator::Less
-                    | PrimitiveOperator::Greater
-                    | PrimitiveOperator::LessEqual
-                    | PrimitiveOperator::GreaterEqual =>
+                    primitive::Operator::Equal
+                    | primitive::Operator::NotEqual
+                    | primitive::Operator::Less
+                    | primitive::Operator::Greater
+                    | primitive::Operator::LessEqual
+                    | primitive::Operator::GreaterEqual =>
                     {
                         if operands.len() >= 2
                         {
@@ -67,7 +67,7 @@ fn infer_type(node: &mut Node, environment: &mut TypeEnvironment)
                         }
                     }
                     // create : T -> (instance T)
-                    PrimitiveOperator::Create =>
+                    primitive::Operator::Create =>
                     {
                         if operands.len() == 1
                         {
@@ -107,7 +107,7 @@ fn infer_type(node: &mut Node, environment: &mut TypeEnvironment)
         Node::PrimitiveOperator(data) => match data.get_operator()
         {
             // + : (int int) -> int
-            PrimitiveOperator::Add =>
+            primitive::Operator::Add =>
             {
                 let operator_type = Type::from(FunctionTypeData::new(
                     // Arguments
@@ -124,7 +124,9 @@ fn infer_type(node: &mut Node, environment: &mut TypeEnvironment)
                 data.set_type(operator_type);
             }
             // ~ : (bool bool) -> bool
-            PrimitiveOperator::And | PrimitiveOperator::Or | PrimitiveOperator::ExclusiveOr =>
+            primitive::Operator::And
+            | primitive::Operator::Or
+            | primitive::Operator::ExclusiveOr =>
             {
                 let operator_type = Type::from(FunctionTypeData::new(
                     // Arguments
@@ -274,7 +276,7 @@ fn infer_type(node: &mut Node, environment: &mut TypeEnvironment)
 
         Node::Type(data) =>
         {
-            let instance_type = data.get_instance_type().make_reference(Reference::Mutable);
+            let instance_type = data.get_instance_type().make_reference(ReferenceMode::Mutable);
 
             for method in data.get_methods_mut().iter_mut()
             {

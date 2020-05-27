@@ -1,21 +1,23 @@
-use super::internal::*;
-use imports::*;
+use crate::language::node::{atomic, primitive};
+use crate::language::symbols::*;
 
-pub fn integer(symbol: &String, _context: &mut Context) -> Option<IntegerNodeData>
+use super::Context;
+
+pub fn integer(symbol: &String, _context: &mut Context) -> Option<atomic::Integer>
 {
     match symbol.parse::<i64>()
     {
-        Ok(value) => Some(IntegerNodeData::new(value)),
+        Ok(value) => Some(atomic::Integer::new(value)),
         Err(_) => None,
     }
 }
 
-pub fn boolean(symbol: &String, _context: &mut Context) -> Option<BooleanNodeData>
+pub fn boolean(symbol: &String, _context: &mut Context) -> Option<atomic::Boolean>
 {
     match symbol.as_str()
     {
-        constants::TRUE => Some(BooleanNodeData::new(true)),
-        constants::FALSE => Some(BooleanNodeData::new(false)),
+        constants::TRUE => Some(atomic::Boolean::new(true)),
+        constants::FALSE => Some(atomic::Boolean::new(false)),
         _ => None,
     }
 }
@@ -23,34 +25,38 @@ pub fn boolean(symbol: &String, _context: &mut Context) -> Option<BooleanNodeDat
 pub fn primitive_operator(
     symbol: &String,
     _context: &mut Context,
-) -> Option<PrimitiveOperatorNodeData>
+) -> Option<atomic::PrimitiveOperator>
 {
     let operator = match symbol.as_str()
     {
-        operators::PLUS => PrimitiveOperator::Add,
+        operators::PLUS => primitive::Operator::Add,
+        operators::MINUS => primitive::Operator::Subtract,
+        operators::TIMES => primitive::Operator::Multiply,
+        operators::DIVIDE => primitive::Operator::Divide,
+        operators::MODULO => primitive::Operator::Modulo,
 
-        operators::EQUAL => PrimitiveOperator::Equal,
-        operators::NOT_EQUAL => PrimitiveOperator::NotEqual,
-        operators::LESS => PrimitiveOperator::Less,
-        operators::GREATER => PrimitiveOperator::Greater,
-        operators::LESS_EQUAL => PrimitiveOperator::LessEqual,
+        operators::EQUAL => primitive::Operator::Equal,
+        operators::NOT_EQUAL => primitive::Operator::NotEqual,
+        operators::LESS => primitive::Operator::Less,
+        operators::GREATER => primitive::Operator::Greater,
+        operators::LESS_EQUAL => primitive::Operator::LessEqual,
 
-        operators::AND => PrimitiveOperator::And,
-        operators::OR => PrimitiveOperator::Or,
-        operators::XOR => PrimitiveOperator::ExclusiveOr,
+        operators::AND => primitive::Operator::And,
+        operators::OR => primitive::Operator::Or,
+        operators::XOR => primitive::Operator::ExclusiveOr,
 
-        operators::CREATE => PrimitiveOperator::Create,
+        operators::CREATE => primitive::Operator::Create,
 
         _ =>
         {
             return None;
-        },
+        }
     };
 
-    Some(PrimitiveOperatorNodeData::new(operator))
+    Some(atomic::PrimitiveOperator::new(operator))
 }
 
-pub fn variable(symbol: &String, _context: &mut Context) -> Option<VariableNodeData>
+pub fn variable(symbol: &String, _context: &mut Context) -> Option<atomic::Variable>
 {
-    return Some(VariableNodeData::new(symbol.clone()));
+    return Some(atomic::Variable::new(symbol.clone()));
 }

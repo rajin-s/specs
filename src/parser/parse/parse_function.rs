@@ -94,7 +94,7 @@ pub fn definition<'a>(
     let return_type = match return_type
     {
         Some(expression) => child(expression, ParseItem::UnparsedType),
-        None => Rc::new(ParseItem::CompleteType(basic_types::void().clone())),
+        None => Rc::new(ParseItem::CompleteType(basic_types::void())),
     };
 
     let arguments = match arguments

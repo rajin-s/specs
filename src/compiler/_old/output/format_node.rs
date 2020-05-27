@@ -87,20 +87,20 @@ fn parse_node(node: &Node, context: &mut FormatContext)
                             let operator_string = match operator_data.get_operator()
                             {
                                 // Arithmetic operators
-                                PrimitiveOperator::Add => "+",
+                                primitive::Operator::Add => "+",
 
                                 // Comparison operators
-                                PrimitiveOperator::Equal => "==",
-                                PrimitiveOperator::NotEqual => "!=",
-                                PrimitiveOperator::Less => "<",
-                                PrimitiveOperator::Greater => ">",
-                                PrimitiveOperator::LessEqual => "<=",
-                                PrimitiveOperator::GreaterEqual => ">=",
+                                primitive::Operator::Equal => "==",
+                                primitive::Operator::NotEqual => "!=",
+                                primitive::Operator::Less => "<",
+                                primitive::Operator::Greater => ">",
+                                primitive::Operator::LessEqual => "<=",
+                                primitive::Operator::GreaterEqual => ">=",
 
                                 // Logical operators
-                                PrimitiveOperator::And => "&&",
-                                PrimitiveOperator::Or => "||",
-                                PrimitiveOperator::ExclusiveOr => "^",
+                                primitive::Operator::And => "&&",
+                                primitive::Operator::Or => "||",
+                                primitive::Operator::ExclusiveOr => "^",
 
                                 _ => "_OPERATOR_",
                             };

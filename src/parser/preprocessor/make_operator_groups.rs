@@ -28,7 +28,7 @@ pub fn apply(expression: &mut SExpression)
 
             // Arithmetic operators
             // group_binary_operators(make_filter![POW], elements);
-            // group_binary_operators(make_filter![TIMES, DIVIDE, MODULO], elements);
+            group_binary_operators(make_filter![TIMES, DIVIDE, MODULO], *source_bracket_type, elements);
             group_binary_operators(make_filter![PLUS, MINUS], *source_bracket_type, elements);
 
             // Logical operators

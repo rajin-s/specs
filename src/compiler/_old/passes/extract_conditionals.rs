@@ -393,7 +393,7 @@ fn extract_conditionals(node: &mut Node, temp_names: &mut TempNameGenerator)
                 (Node::Conditional(_), Node::Conditional(_)) =>
                 {
                     let temp_name = temp_names.next();
-                    let temp_type = data.get_lhs().get_type().make_reference(Reference::Mutable);
+                    let temp_type = data.get_lhs().get_type().make_reference(ReferenceMode::Mutable);
 
                     // Extract the original LHS and RHS
                     let mut original_lhs = Node::Nothing;
@@ -412,7 +412,7 @@ fn extract_conditionals(node: &mut Node, temp_names: &mut TempNameGenerator)
                                 make_temp_variable(&temp_name, &temp_type),
                                 Node::from(ReferenceNodeData::new_infer_type(
                                     temp,
-                                    Reference::Mutable,
+                                    ReferenceMode::Mutable,
                                 )),
                             ));
 
@@ -428,7 +428,7 @@ fn extract_conditionals(node: &mut Node, temp_names: &mut TempNameGenerator)
                                 make_temp_variable(&temp_name, &temp_type),
                                 Node::from(ReferenceNodeData::new_infer_type(
                                     temp,
-                                    Reference::Mutable,
+                                    ReferenceMode::Mutable,
                                 )),
                             ));
 
@@ -506,7 +506,7 @@ fn extract_conditionals(node: &mut Node, temp_names: &mut TempNameGenerator)
                 (Node::Conditional(_), _) =>
                 {
                     let temp_name = temp_names.next();
-                    let temp_type = data.get_lhs().get_type().make_reference(Reference::Mutable);
+                    let temp_type = data.get_lhs().get_type().make_reference(ReferenceMode::Mutable);
 
                     // Extract the original LHS, replacing with (deref temp)
                     let mut original_lhs = Node::from(DereferenceNodeData::new(
@@ -525,7 +525,7 @@ fn extract_conditionals(node: &mut Node, temp_names: &mut TempNameGenerator)
                                 make_temp_variable(&temp_name, &temp_type),
                                 Node::from(ReferenceNodeData::new_infer_type(
                                     temp,
-                                    Reference::Mutable,
+                                    ReferenceMode::Mutable,
                                 )),
                             ));
 
@@ -541,7 +541,7 @@ fn extract_conditionals(node: &mut Node, temp_names: &mut TempNameGenerator)
                                 make_temp_variable(&temp_name, &temp_type),
                                 Node::from(ReferenceNodeData::new_infer_type(
                                     temp,
-                                    Reference::Mutable,
+                                    ReferenceMode::Mutable,
                                 )),
                             ));
 
@@ -581,7 +581,7 @@ fn extract_conditionals(node: &mut Node, temp_names: &mut TempNameGenerator)
                 (_, Node::Conditional(_)) =>
                 {
                     let temp_name = temp_names.next();
-                    let temp_type = data.get_lhs().get_type().make_reference(Reference::Mutable);
+                    let temp_type = data.get_lhs().get_type().make_reference(ReferenceMode::Mutable);
 
                     // Extract the original RHS
                     let mut original_rhs = Node::Nothing;
@@ -629,7 +629,7 @@ fn extract_conditionals(node: &mut Node, temp_names: &mut TempNameGenerator)
                             temp_name,
                             Node::from(ReferenceNodeData::new_infer_type(
                                 bind_temp,
-                                Reference::Mutable,
+                                ReferenceMode::Mutable,
                             )),
                         ));
 

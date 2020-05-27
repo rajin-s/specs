@@ -6,7 +6,8 @@
         "markdown",
         "latex",
         "plaintext",
-        "hlsl"
+        "hlsl",
+        "rust"
     ],
     "spellright.parserByClass": {
         "hlsl": {

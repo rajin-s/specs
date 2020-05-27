@@ -17,7 +17,7 @@ fn convert_method_definitions(node: &mut Node, _params: &mut ())
     {
         Node::Type(data) =>
         {
-            let self_type = data.get_instance_type().make_reference(Reference::Mutable);
+            let self_type = data.get_instance_type().make_reference(ReferenceMode::Mutable);
 
             for method in data.get_methods_mut().iter_mut()
             {

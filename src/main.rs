@@ -2,25 +2,17 @@
 #![allow(dead_code)]
 
 #[macro_use]
-extern crate lazy_static;
-
-#[macro_use]
 mod macros;
+mod utilities;
 
-use std::fs;
-
-mod compiler;
 mod language;
 mod parser;
+mod compiler;
 
-use compiler::*;
-use language::nodes::*;
+// use compiler::*;
+use language::node::*;
 use parser::*;
-
-fn print_type(node: &Node, _params: &mut ())
-{
-    println!("{}: {}", node, node.get_type());
-}
+use std::fs;
 
 fn main()
 {
@@ -74,20 +66,22 @@ fn main()
                     println!("Parse Result:");
                     println!("\t{}\n", &node);
 
-                    let mut options = CompilerOptions::new();
-                    {
-                        options.show_debug_output = true;
-                    }
+                    let _result = compiler::compile(node);
 
-                    let mut compiler = Compiler::new(options, node);
-                    let compile_result = compiler.compile();
+                    // let mut options = CompilerOptions::new();
+                    // {
+                    //     options.show_debug_output = true;
+                    // }
 
-                    if let Some(c_string) = compile_result
-                    {
-                        println!("C output:\n");
-                        println!("{}", c_string);
-                        let _ = fs::write(output_path, c_string);
-                    }
+                    // let mut compiler = Compiler::new(options, node);
+                    // let compile_result = compiler.compile();
+
+                    // if let Some(c_string) = compile_result
+                    // {
+                    //     println!("C output:\n");
+                    //     println!("{}", c_string);
+                    //     let _ = fs::write(output_path, c_string);
+                    // }
                 }
                 ParseResult::Error(errors, warnings) =>
                 {

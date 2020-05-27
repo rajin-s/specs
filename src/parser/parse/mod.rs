@@ -6,7 +6,7 @@ mod parse_atomic;
 mod parse_function;
 
 use crate::s_expression::*;
-use crate::language::nodes::*;
+use crate::language::node::*;
 
 // Parse an expression into a node using a ParseQueue
 pub fn parse_root_expression(expression: &SExpression, context: &mut Context) -> Option<Node>

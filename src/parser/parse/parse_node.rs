@@ -5,6 +5,9 @@ use super::parse_atomic;
 use super::parse_function;
 use super::parse_type;
 
+use crate::language::ReferenceMode;
+use crate::language::node::all::*;
+
 pub enum ParseExpressionResult<'a>
 {
     Complete(Node),
@@ -108,13 +111,13 @@ pub fn parse_expression<'a>(
             //  (ref a)
             [Symbol(x), a] if x == operators::REFERENCE =>
             {
-                PartialNodeData::Reference(Reference::Immutable, child(a))
+                PartialNodeData::Reference(ReferenceMode::Immutable, child(a))
             }
             // Unary Mutable Reference Operator
             //  (mut-ref a)
             [Symbol(x), a] if x == operators::MUTABLE_REFERENCE =>
             {
-                PartialNodeData::Reference(Reference::Mutable, child(a))
+                PartialNodeData::Reference(ReferenceMode::Mutable, child(a))
             }
             // Unary Dereference Operator
             //  (deref a)
@@ -132,7 +135,7 @@ pub fn parse_expression<'a>(
             //  (if a then b)
             [Symbol(x1), a, Symbol(x2), b] if x1 == keywords::IF && x2 == keywords::THEN =>
             {
-                PartialNodeData::Conditional(child(a), child(b), complete_child(Node::Nothing))
+                PartialNodeData::Conditional(child(a), child(b), complete_child(atomic::Nothing::new().to_node()))
             }
             // If-Then-Else
             //  (if a then b else c)
@@ -242,7 +245,7 @@ pub fn parse_expression<'a>(
                             "()",
                         );
 
-                        return ParseExpressionResult::Complete(Node::Nothing);
+                        return ParseExpressionResult::Complete(atomic::Nothing::new().to_node());
                     }
                 }
             }
@@ -258,7 +261,7 @@ pub fn parse_expression<'a>(
         List(BracketType::Curly, elements) =>
         {
             let nodes = elements.iter().map(|x| child(x)).collect();
-            PartialNodeData::Sequence(false, nodes)
+            PartialNodeData::Sequence(SequenceMode::Scope, nodes)
         }
 
         // [...]
@@ -272,7 +275,7 @@ pub fn parse_expression<'a>(
         List(BracketType::None, elements) =>
         {
             let nodes = elements.iter().map(|x| child(x)).collect();
-            PartialNodeData::Sequence(true, nodes)
+            PartialNodeData::Sequence(SequenceMode::Transparent, nodes)
         }
     };
 
@@ -318,13 +321,16 @@ pub fn construct(data: PartialNodeData, context: &mut Context) -> Option<Node>
         Dereference(target) => construct_dereference_node(target, context),
         Binding(name, binding) => construct_binding_node(name, binding, context),
         Assignment(lhs, rhs) => construct_assignment_node(lhs, rhs, context),
-        Sequence(trans, nodes) => construct_sequence_node(trans, nodes, context),
+        Sequence(mode, nodes) => construct_sequence_node(mode, nodes, context),
         Conditional(cond, thn, els) => construct_conditional_node(cond, thn, els, context),
         Function((name, args, ret, body)) =>
         {
             construct_function_node(name, args, ret, body, context)
         }
-        Type((name, members, methods, traits)) => construct_type_node(name, members, methods, traits, context),
+        Type((name, members, methods, traits)) =>
+        {
+            construct_type_node(name, members, methods, traits, context)
+        }
         Access(target, name) => construct_access_node(target, name, context),
 
         _ =>
@@ -364,7 +370,7 @@ fn construct_call_node(
             // Make sure all nodes were successfully converted
             if operands.len() == operand_count
             {
-                Some(CallNodeData::new(operator, operands).to_node())
+                Some(operator::Call::new(operator, operands).to_node())
             }
             else
             {
@@ -389,14 +395,14 @@ fn construct_call_node(
 }
 
 fn construct_reference_node<'a>(
-    reference_type: Reference,
+    mode: ReferenceMode,
     target: ParseItemReference<'a>,
     context: &mut Context,
 ) -> Option<Node>
 {
     match get_node(target)
     {
-        Ok(target) => Some(ReferenceNodeData::new(target, reference_type).to_node()),
+        Ok(target) => Some(operator::Reference::new(mode, target).to_node()),
         Err(item) =>
         {
             context.add_error(
@@ -415,7 +421,7 @@ fn construct_dereference_node<'a>(
 {
     match get_node(target)
     {
-        Ok(target) => Some(DereferenceNodeData::new(target).to_node()),
+        Ok(target) => Some(operator::Dereference::new(target).to_node()),
         Err(item) =>
         {
             context.add_error(
@@ -436,7 +442,7 @@ fn construct_binding_node<'a>(
 {
     match get_node(binding)
     {
-        Ok(binding) => Some(BindingNodeData::new(name, binding).to_node()),
+        Ok(binding) => Some(binding::Binding::new(name, binding).to_node()),
         Err(item) =>
         {
             context.add_error(
@@ -456,7 +462,7 @@ fn construct_assignment_node<'a>(
 {
     match (get_node(lhs), get_node(rhs))
     {
-        (Ok(lhs), Ok(rhs)) => Some(AssignmentNodeData::new(lhs, rhs).to_node()),
+        (Ok(lhs), Ok(rhs)) => Some(operator::Assign::new(lhs, rhs).to_node()),
         (lhs, rhs) =>
         {
             if let Err(item) = lhs
@@ -480,7 +486,7 @@ fn construct_assignment_node<'a>(
     }
 }
 fn construct_sequence_node<'a>(
-    is_transparent: bool,
+    mode: control::SequenceMode,
     mut nodes: Vec<ParseItemReference<'a>>,
     context: &mut Context,
 ) -> Option<Node>
@@ -500,14 +506,7 @@ fn construct_sequence_node<'a>(
     // Make sure all nodes were successfully converted
     if nodes.len() == node_count
     {
-        if is_transparent
-        {
-            Some(SequenceNodeData::new_transparent(nodes).to_node())
-        }
-        else
-        {
-            Some(SequenceNodeData::new(nodes).to_node())
-        }
+        Some(control::Sequence::new(mode, nodes).to_node())
     }
     else
     {
@@ -534,7 +533,7 @@ fn construct_conditional_node<'a>(
     {
         (Ok(condition), Ok(then_branch), Ok(else_branch)) =>
         {
-            Some(ConditionalNodeData::new(condition, then_branch, else_branch).to_node())
+            Some(control::Conditional::new(condition, then_branch, else_branch).to_node())
         }
         (condition, then_branch, else_branch) =>
         {
@@ -573,7 +572,7 @@ fn construct_function_node_data<'a>(
     return_type: ParseItemReference<'a>,
     body: ParseItemReference<'a>,
     context: &mut Context,
-) -> Option<FunctionNodeData>
+) -> Option<definition::Function>
 {
     match (get_node(body), get_type(return_type))
     {
@@ -584,7 +583,7 @@ fn construct_function_node_data<'a>(
                 .into_iter()
                 .filter_map(|(name, t)| match get_type(t)
                 {
-                    Ok(t) => Some(ArgumentData::new(name, t)),
+                    Ok(t) => Some(definition::Argument::new(name, t)),
                     Err(item) =>
                     {
                         context.add_error(
@@ -599,12 +598,11 @@ fn construct_function_node_data<'a>(
 
             if arguments.len() == argument_count
             {
-                Some(FunctionNodeData::new(
+                Some(definition::Function::new(
                     name,
                     arguments,
                     return_type,
                     body,
-                    FunctionMetadata::new_basic(),
                 ))
             }
             else
@@ -663,58 +661,65 @@ fn construct_type_node<'a>(
     context: &mut Context,
 ) -> Option<Node>
 {
-    let member_count = members.len();
-    let method_count = methods.len();
+    return None;
 
-    let members: Vec<_> = members
-        .into_iter()
-        .filter_map(|(name, t, scope, read, write)| match get_type(t)
-        {
-            Ok(t) => Some(MemberData::new(name, t, read, write, scope)),
-            Err(item) =>
-            {
-                context.add_error(
-                    errors::FAILED_CONSTRUCT,
-                    "Failed to get complete type for type definition member",
-                    item,
-                );
-                None
-            }
-        })
-        .collect();
+    // let member_count = members.len();
+    // let method_count = methods.len();
 
-    let methods: Vec<_> = methods
-        .into_iter()
-        .filter_map(
-            |((name, arguments, return_type, body), scope, visibility)| {
-                match construct_function_node_data(name, arguments, return_type, body, context)
-                {
-                    Some(function_data) => Some(MethodData::new(function_data, visibility, scope)),
-                    None => None,
-                }
-            },
-        )
-        .collect();
+    // let members: Vec<_> = members
+    //     .into_iter()
+    //     .filter_map(|(name, t, scope, read, write)| match get_type(t)
+    //     {
+    //         Ok(t) => Some(MemberData::new(name, t, read, write, scope)),
+    //         Err(item) =>
+    //         {
+    //             context.add_error(
+    //                 errors::FAILED_CONSTRUCT,
+    //                 "Failed to get complete type for type definition member",
+    //                 item,
+    //             );
+    //             None
+    //         }
+    //     })
+    //     .collect();
 
-    let traits: Vec<_> = traits.into_iter().map(|name| {TraitData::new(name)}).collect();
+    // let methods: Vec<_> = methods
+    //     .into_iter()
+    //     .filter_map(
+    //         |((name, arguments, return_type, body), scope, visibility)| {
+    //             match construct_function_node_data(name, arguments, return_type, body, context)
+    //             {
+    //                 Some(function_data) => Some(MethodData::new(function_data, visibility, scope)),
+    //                 None => None,
+    //             }
+    //         },
+    //     )
+    //     .collect();
 
-    // Make all members and methods were constructed
-    match (member_count - members.len(), method_count - methods.len())
-    {
-        (0, 0) => Some(Node::from(TypeNodeData::new(name, members, methods, traits))),
-        (failed_members, failed_methods) =>
-        {
-            context.add_error(
-                errors::FAILED_CONSTRUCT,
-                "Failed to get construct all function arguments",
-                format!(
-                    "failed {} members, {} methods",
-                    failed_members, failed_methods
-                ),
-            );
-            None
-        }
-    }
+    // let traits: Vec<_> = traits
+    //     .into_iter()
+    //     .map(|name| TraitData::new(name))
+    //     .collect();
+
+    // // Make all members and methods were constructed
+    // match (member_count - members.len(), method_count - methods.len())
+    // {
+    //     (0, 0) => Some(Node::from(TypeNodeData::new(
+    //         name, members, methods, traits,
+    //     ))),
+    //     (failed_members, failed_methods) =>
+    //     {
+    //         context.add_error(
+    //             errors::FAILED_CONSTRUCT,
+    //             "Failed to get construct all function arguments",
+    //             format!(
+    //                 "failed {} members, {} methods",
+    //                 failed_members, failed_methods
+    //             ),
+    //         );
+    //         None
+    //     }
+    // }
 }
 
 fn construct_access_node<'a>(
@@ -725,7 +730,7 @@ fn construct_access_node<'a>(
 {
     match get_node(target)
     {
-        Ok(target) => Some(AccessNodeData::new(target, name).to_node()),
+        Ok(target) => Some(operator::Access::new(target, name).to_node()),
         Err(item) =>
         {
             context.add_error(

@@ -1,19 +1,50 @@
-pub mod symbols;
 pub mod runtime;
-pub mod primitives;
+pub mod symbols;
 
-pub mod nodes;
+#[macro_use]
+pub mod node;
+
+#[macro_use]
 pub mod types;
-pub mod traits;
 
-mod display;
+/* -------------------------------------------------------------------------- */
+/*                                 Basic Stuff                                */
+/* -------------------------------------------------------------------------- */
 
-// pub mod types;
-// pub mod primitives;
-// pub mod symbols;
-// pub mod nodes;
-// pub mod data;
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub enum ReferenceMode
+{
+    Mutable,
+    Immutable,
+}
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub enum MemberScope
+{
+    Static,
+    Instance,
+}
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub enum Visibility
+{
+    Private,
+    Public,
+}
 
-// pub mod parse;
-
-// mod display;
+/* -------------------------------------------------------------------------- */
+/*                                   Display                                  */
+/* -------------------------------------------------------------------------- */
+impl std::fmt::Display for ReferenceMode
+{
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result
+    {
+        write!(
+            f,
+            "{}",
+            match self
+            {
+                ReferenceMode::Immutable => "ref",
+                ReferenceMode::Mutable => "ref-mut",
+            }
+        )
+    }
+}

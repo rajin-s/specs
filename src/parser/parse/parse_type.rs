@@ -1,6 +1,8 @@
 use super::internal::*;
 use imports::*;
 
+use crate::language::{MemberScope, Visibility};
+
 use super::parse_function;
 
 /* -------------------------------------------------------------------------- */
@@ -27,10 +29,10 @@ pub fn parse_expression<'a>(
         {
             let t = match symbol.as_str()
             {
-                primitive_data_types::INTEGER => basic_types::integer().clone(),
-                primitive_data_types::BOOLEAN => basic_types::boolean().clone(),
-                primitive_data_types::VOID => basic_types::void().clone(),
-                symbol => Type::new_instance(String::from(symbol)),
+                primitive_data_types::INTEGER => basic_types::integer(),
+                primitive_data_types::BOOLEAN => basic_types::boolean(),
+                primitive_data_types::VOID => basic_types::void(),
+                _ => class::InstanceType::new(symbol.clone()).to_type(),
             };
 
             ParseExpressionResult::Complete(t)
@@ -165,7 +167,7 @@ pub fn definition<'a>(
                                     .map(|x| public_write.insert(x))
                                     .collect();
 
-                                // Colect new child items
+                                // Collect new child items
                                 child_items.append(&mut new_child_items);
                             }
                             // <is T>
@@ -174,7 +176,8 @@ pub fn definition<'a>(
                                 traits.push(name.clone());
                             }
                             // <is T {}>
-                            [Symbol(x), Symbol(name), List(BracketType::Curly, _block_elements)] if x == keywords::IS =>
+                            [Symbol(x), Symbol(name), List(BracketType::Curly, _block_elements)]
+                                if x == keywords::IS =>
                             {
                                 traits.push(name.clone());
                                 context.add_warning(

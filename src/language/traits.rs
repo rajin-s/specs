@@ -10,7 +10,7 @@ impl Trait
 {
     pub fn new(name: String) -> Self
     {
-        return Self { name: name };
+        return Self { name };
     }
 }
 

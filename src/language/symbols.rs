@@ -118,9 +118,10 @@ pub mod operators
     {
         match s.as_str()
         {
-            // ASSIGN | MINUS | TIMES | DIVIDE | MODULO | POW |
-            PLUS | EQUAL | NOT_EQUAL | LESS | GREATER | LESS_EQUAL | GREATER_EQUAL | AND | OR
-            | XOR => true,
+            PLUS | MINUS | TIMES | DIVIDE | MODULO
+            | EQUAL | NOT_EQUAL 
+            | LESS | GREATER | LESS_EQUAL | GREATER_EQUAL 
+            | AND | OR| XOR => true,
             _ => false,
         }
     }

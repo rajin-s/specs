@@ -18,13 +18,13 @@ fn expand_create_operator(node: &mut Node, _params: &mut ())
         {
             if let Node::PrimitiveOperator(operator_data) = call_data.get_operator()
             {
-                if operator_data.get_operator() == PrimitiveOperator::Create
+                if operator_data.get_operator() == primitive::Operator::Create
                 {
                     // Operator : create => _specs_allocate
                     {
-                        let mut allocate_operator = Node::from(VariableNodeData::new(String::from(
-                            runtime::names::ALLOCATE_FUNCTION,
-                        )));
+                        let mut allocate_operator = Node::from(VariableNodeData::new(
+                            String::from(runtime::names::ALLOCATE_FUNCTION),
+                        ));
                         swap(&mut allocate_operator, call_data.get_operator_mut());
                     }
 

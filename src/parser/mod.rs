@@ -5,7 +5,7 @@ mod parse_s_expression;
 mod preprocessor;
 mod parse;
 
-use crate::language::nodes::Node;
+use crate::language::node::Node;
 
 pub struct Parser {}
 impl Parser
