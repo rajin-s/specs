@@ -6,5 +6,23 @@
         "*.putt": "json",
         "*.rml": "rust",
         "specs_runtime.h": "c"
+    },
+    "spellright.language": [
+        "en"
+    ],
+    "spellright.documentTypes": [
+        "markdown",
+        "latex",
+        "plaintext",
+        "hlsl",
+        "specs"
+    ],
+    "spellright.parserByClass": {
+        "hlsl": {
+            "parser": "code"
+        },
+        "specs": {
+            "parser": "code"
+        }
     }
 }

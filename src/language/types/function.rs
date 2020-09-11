@@ -33,6 +33,14 @@ impl FunctionType
     get!(get_traits      -> traits.clone() : Indirect<TraitSet>);
 }
 
+impl PartialEq for FunctionType
+{
+    fn eq(&self, other: &Self) -> bool
+    {
+        false
+    }
+}
+
 impl std::fmt::Display for FunctionType
 {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result

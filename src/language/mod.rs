@@ -1,5 +1,6 @@
 pub mod runtime;
 pub mod symbols;
+pub mod s_expression;
 
 #[macro_use]
 pub mod node;

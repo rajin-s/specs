@@ -87,8 +87,9 @@ pub mod operators
 {
     symbols![
         "." => ACCESS,
-        "=" => ASSIGN,
-        "=" => BINDING_ASSIGN,
+        "<-" => ASSIGN,
+        "->" => ASSIGN_REVERSE,
+        "=" => ASSIGN_BINDING,
         "+" => PLUS,
         "-" => MINUS,
         "*" => TIMES,
@@ -104,7 +105,6 @@ pub mod operators
         "and" => AND,
         "or" => OR,
         "xor" => XOR,
-        
         "deref" => DEREFERENCE,
         "not" => NOT,
         "ref" => REFERENCE,
@@ -118,10 +118,8 @@ pub mod operators
     {
         match s.as_str()
         {
-            PLUS | MINUS | TIMES | DIVIDE | MODULO
-            | EQUAL | NOT_EQUAL 
-            | LESS | GREATER | LESS_EQUAL | GREATER_EQUAL 
-            | AND | OR| XOR => true,
+            PLUS | MINUS | TIMES | DIVIDE | MODULO | EQUAL | NOT_EQUAL | LESS | GREATER
+            | LESS_EQUAL | GREATER_EQUAL | AND | OR | XOR => true,
             _ => false,
         }
     }
@@ -139,6 +137,7 @@ pub mod operators
 
 pub mod keywords
 {
+    #![allow(unreachable_patterns)]
     symbols![
         "fn" => FUNCTION,
         "->" => ARROW,
@@ -194,6 +193,11 @@ pub mod primitive_data_types
         "tag" => SHORTSTRING,
         "string" => LONGSTRING,
     ];
+}
+
+pub fn is_structural(symbol: &String) -> bool
+{
+    keywords::contains(symbol) || operators::contains(symbol)
 }
 
 // Get a hash set containing all symbols

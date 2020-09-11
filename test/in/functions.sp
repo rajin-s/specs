@@ -33,7 +33,6 @@ fn Is-Seven [x int] -> bool
         x == 6      => false
         x == 8      => false
         (Is-Even x) => false
-
     }
     else
     {
@@ -141,9 +140,10 @@ fn DotSum
 (DotSum (DotSum 1 2 3 4) (DotSum 5 6 7 8)
         (DotSum 9 10 11 12) (DotSum 13 14 15 16))
 
-<<<
 <<< Function pointers
     (no closures yet!) >>>
+
+<<<
 
 fn Add-5 [x int] -> int { x + 5 }
 

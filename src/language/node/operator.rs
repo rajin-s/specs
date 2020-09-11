@@ -11,30 +11,52 @@ pub struct Call
     operator:  OtherNode,
     operands:  OtherNodes,
     node_type: Indirect<Type>,
+    source:    Source,
 }
 impl Call
 {
-    pub fn new(operator: Node, operands: Vec<Node>) -> Self
+    pub fn new(operator: Node, operands: Vec<Node>, source: Source) -> Self
     {
         return Self {
-            operator:  OtherNode::new(operator),
-            operands:  operands.into_iter().map(Indirect::new).collect(),
+            operator: OtherNode::new(operator),
+            operands,
             node_type: basic_types::indirect::unknown(),
+            source,
         };
     }
 
-    get!(get_operator -> operator.clone() : OtherNode);
-    get!(get_operands -> operands : &Vec<OtherNode>);
+    get!(get_operator     -> operator.as_ref() : &Node);
+    get!(get_operator_mut -> operator.as_mut() : &mut Node);
+
+    get!(get_operands     -> operands : &Vec<Node>);
+    get!(get_operands_mut -> operands : &mut Vec<Node>);
 
     get!(get_type    -> node_type.clone() : Indirect<Type>);
     get!(borrow_type -> node_type.borrow() : Ref<Type>);
     set!(set_type    -> node_type : Indirect<Type>);
 
-    pub fn get_children(&self) -> Vec<OtherNode>
+    pub fn get_all_mut(&mut self) -> (&mut Node, &mut Vec<Node>)
     {
-        let mut result = vec![self.operator.clone()];
-        result.append(&mut self.operands.iter().map(Indirect::clone).collect());
+        (self.operator.as_mut(), &mut self.operands)
+    }
 
+    get!(get_source -> source.clone() : Source);
+}
+
+impl Recur<Node> for Call
+{
+    fn get_children(&self) -> Vec<&Node>
+    {
+        let mut result = vec![self.operator.as_ref()];
+        result.append(&mut self.operands.iter().collect());
+    
+        result
+    }
+    fn get_children_mut(&mut self) -> Vec<&mut Node>
+    {
+        let mut result = vec![self.operator.as_mut()];
+        result.append(&mut self.operands.iter_mut().collect());
+    
         result
     }
 }
@@ -49,15 +71,17 @@ pub struct Reference
     mode:      ReferenceMode,
     target:    OtherNode,
     node_type: Indirect<Type>,
+    source:    Source,
 }
 impl Reference
 {
-    pub fn new(mode: ReferenceMode, target: Node) -> Self
+    pub fn new(mode: ReferenceMode, target: Node, source: Source) -> Self
     {
         return Self {
             mode,
             target: OtherNode::new(target),
             node_type: basic_types::indirect::unknown(),
+            source,
         };
     }
 
@@ -67,12 +91,14 @@ impl Reference
     get!(borrow_type -> node_type.borrow() : Ref<Type>);
     set!(set_type    -> node_type : Indirect<Type>);
 
+    get!(get_source -> source.clone() : Source);
+
     get_children! {
-        get_target,
-        borrow_target,
-        borrow_target_mut -> target
+        get_target, get_target_mut -> target
     }
 }
+
+impl_recur!{ Reference [target] }
 
 /* -------------------------------------------------------------------------- */
 /*                                 Dereference                                */
@@ -83,14 +109,16 @@ pub struct Dereference
 {
     target:    OtherNode,
     node_type: Indirect<Type>,
+    source:    Source,
 }
 impl Dereference
 {
-    pub fn new(target: Node) -> Self
+    pub fn new(target: Node, source: Source) -> Self
     {
         return Self {
-            target:    OtherNode::new(target),
+            target: OtherNode::new(target),
             node_type: basic_types::indirect::unknown(),
+            source,
         };
     }
 
@@ -98,12 +126,14 @@ impl Dereference
     get!(borrow_type -> node_type.borrow() : Ref<Type>);
     set!(set_type    -> node_type : Indirect<Type>);
 
+    get!(get_source -> source.clone() : Source);
+
     get_children! {
-        get_target,
-        borrow_target,
-        borrow_target_mut -> target
+        get_target, get_target_mut -> target
     }
 }
+
+impl_recur!{ Dereference [target] }
 
 /* -------------------------------------------------------------------------- */
 /*                                   Assign                                   */
@@ -112,34 +142,35 @@ impl Dereference
 #[derive(Debug)]
 pub struct Assign
 {
-    lhs: OtherNode,
-    rhs: OtherNode,
+    lhs:       OtherNode,
+    rhs:       OtherNode,
     node_type: Indirect<Type>,
+    source:    Source,
 }
 impl Assign
 {
-    pub fn new(lhs: Node, rhs: Node) -> Self
+    pub fn new(lhs: Node, rhs: Node, source: Source) -> Self
     {
         return Self {
             lhs: OtherNode::new(lhs),
             rhs: OtherNode::new(rhs),
             node_type: basic_types::indirect::void(),
+            source,
         };
     }
 
     get!(get_type    -> node_type.clone() : Indirect<Type>);
     get!(borrow_type -> node_type.borrow() : Ref<Type>);
 
-    get_children! {
-        get_lhs,
-        borrow_lhs,
-        borrow_lhs_mut -> lhs,
+    get!(get_source -> source.clone() : Source);
 
-        get_rhs,
-        borrow_rhs,
-        borrow_rhs_mut -> rhs,
+    get_children! {
+        get_lhs, get_lhs_mut -> lhs,
+        get_rhs, get_rhs_mut -> rhs,
     }
 }
+
+impl_recur!{ Assign [lhs, rhs] }
 
 /* -------------------------------------------------------------------------- */
 /*                                   Access                                   */
@@ -151,15 +182,17 @@ pub struct Access
     target:        OtherNode,
     property_name: String,
     node_type:     Indirect<Type>,
+    source:        Source,
 }
 impl Access
 {
-    pub fn new(target: Node, property_name: String) -> Self
+    pub fn new(target: Node, property_name: String, source: Source) -> Self
     {
         return Self {
             target: OtherNode::new(target),
             property_name,
             node_type: basic_types::indirect::unknown(),
+            source,
         };
     }
 
@@ -170,12 +203,14 @@ impl Access
     get!(borrow_type -> node_type.borrow() : Ref<Type>);
     set!(set_type    -> node_type : Indirect<Type>);
 
+    get!(get_source -> source.clone() : Source);
+
     get_children! {
-        get_target,
-        borrow_target,
-        borrow_target_mut -> target
+        get_target, get_target_mut -> target
     }
 }
+
+impl_recur!{ Access [target] }
 
 /* -------------------------------------------------------------------------- */
 /*                                   Display                                  */
@@ -185,7 +220,7 @@ impl std::fmt::Display for Call
 {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result
     {
-        let _ = write!(f, "({}:", self.get_operator());
+        let _ = write!(f, "({} ~", self.get_operator());
         for operand in &self.operands
         {
             let _ = write!(f, " {}", operand);
@@ -204,7 +239,7 @@ simple_fmt_display! {
         get_target()
 }
 simple_fmt_display! {
-    Assign : "({} := {})",
+    Assign : "({} <- {})",
         get_lhs(),
         get_rhs(),
 }

@@ -56,12 +56,30 @@ impl InstanceType
     }
 }
 
+impl PartialEq for InstanceType
+{
+    fn eq(&self, other: &Self) -> bool
+    {
+        false
+    }
+}
+
+
 /* -------------------------------------------------------------------------- */
 /*                                    Class                                   */
 /* -------------------------------------------------------------------------- */
 
 #[derive(Debug)]
 pub struct ClassType {}
+
+impl PartialEq for ClassType
+{
+    fn eq(&self, other: &Self) -> bool
+    {
+        false
+    }
+}
+
 
 /* -------------------------------------------------------------------------- */
 /*                                   Display                                  */

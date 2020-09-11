@@ -5,11 +5,11 @@ typedef int bool;
 #define true 1
 #define false 0
 
-int _specs__UserMain();
+int __SpecsMain__();
 
 int main( int argc, char** argv )
 {
-    int result = _specs__UserMain();
+    int result = __SpecsMain__();
     printf( "out: %d\n", result );
 }
 

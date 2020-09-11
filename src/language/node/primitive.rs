@@ -21,6 +21,7 @@ pub enum Operator
     GreaterEqual,
 
     // Logical operators
+    Not,
     And,
     Or,
     ExclusiveOr,
@@ -29,6 +30,9 @@ pub enum Operator
     Create,
     HeapAllocate,
     HeapFree,
+
+    // Other operators
+    Return,
 }
 
 /* -------------------------------------------------------------------------- */
@@ -57,6 +61,7 @@ impl std::fmt::Display for Operator
             Operator::GreaterEqual => ">=",
 
             // Logical operators
+            Operator::Not => "not",
             Operator::And => "and",
             Operator::Or => "or",
             Operator::ExclusiveOr => "xor",
@@ -65,6 +70,9 @@ impl std::fmt::Display for Operator
             Operator::Create => "create",
             Operator::HeapAllocate => "heap-alloc",
             Operator::HeapFree => "heap-free",
+
+            // Other operators
+            Operator::Return => "return",
         };
         write!(f, "{}", s)
     }

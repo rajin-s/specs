@@ -1,453 +1,457 @@
-use super::s_expression::*;
+use crate::utilities::*;
+
+use crate::language::s_expression::*;
 use crate::language::symbols;
-use std::collections::VecDeque;
+
+use crate::errors::s_expression_error::*;
+use crate::source::Source;
+
+impl super::Parser
+{
+    pub fn make_s_expression(&self, text: String) -> ResultLog<SExpression, Error>
+    {
+        let line_count = text.split('\n').fold(0, |n, _e| n + 1);
+        let root_source = Source::new(0, line_count, 0, text.len(), text);
+
+        let mut root_node = ParseNode::Unparsed(BracketType::Curly, root_source);
+        let mut transform = ParseTransform::new();
+
+        let warnings = match transform.apply(&mut root_node)
+        {
+            ResultLog::Ok(()) => Vec::new(),
+            ResultLog::Warn((), warnings) => warnings,
+            ResultLog::Error(errors, warnings) =>
+            {
+                return ResultLog::Error(errors, warnings);
+            }
+        };
+
+        match root_node
+        {
+            ParseNode::Parsed(s_expression) => ResultLog::maybe_warn(s_expression, warnings),
+            root_node =>
+            {
+                let error = Error::Internal(format!("Failed to parse root node: {:?}", root_node));
+                ResultLog::Error(vec![error], warnings)
+            }
+        }
+    }
+}
 
 #[derive(Debug)]
-enum ParseNode<'a>
+enum ParseNode
 {
-    Symbol(&'a str), // An atomic symbol (no further parsing can be done)
-    List(BracketType, Vec<ParseNode<'a>>), // A list of potentially parsed nodes
-    Unparsed(BracketType, &'a str), // An unparsed node that still needs to be expanded
-}
-type NodeQueue<'a> = VecDeque<&'a mut ParseNode<'a>>;
-
-pub fn parse_expression(source: &String) -> Option<SExpression>
-{
-    // Perform raw text operations
-    let stripped = strip_comments(source.as_str());
-
-    // Create the parse tree root
-    let mut parse_root = ParseNode::Unparsed(BracketType::Curly, stripped.as_str());
-
-    // Expand and traverse the parse tree in breadth-first order
-    let mut parse_queue = NodeQueue::new();
-    parse_queue.push_back(&mut parse_root);
-
-    // Keep expanding nodes until none are left
-    while let Some(node) = parse_queue.pop_front()
-    {
-        expand_node(node);
-
-        // Add child nodes to the parse queue
-        if let ParseNode::List(_, child_nodes) = node
-        {
-            for child_node in child_nodes.iter_mut()
-            {
-                parse_queue.push_back(child_node);
-            }
-        }
-    }
-
-    // Convert the parse tree to an S-Expression
-    return make_s_expression(parse_root);
+    Parsed(SExpression),
+    Unparsed(BracketType, Source),
+    PartialList(BracketType, Vec<ParseNode>, Source),
+    Comment(Source),
 }
 
-fn strip_comments(source: &str) -> String
+impl Recur<ParseNode> for ParseNode
 {
-    // Accumulate segments of the source string
-    let mut segments: Vec<&str> = Vec::new();
-
-    let mut start = 0;
-    let mut end = 0;
-
-    let mut inside_line_comment = false;
-
-    let mut block_comment_open_count = 0;
-    let mut block_comment_start_count = 0;
-    let mut block_comment_end_count = 0;
-
-    for (i, character) in source.chars().enumerate()
+    fn get_children(&self) -> Vec<&ParseNode>
     {
-        match character
+        match self
         {
-            // <
-            symbols::keywords::BLOCK_COMMENT_START_CHAR =>
-            {
-                block_comment_start_count += 1;
-                block_comment_end_count = 0;
-
-                // This is potentially just a normal character, so it might end up in the output
-                end = i + 1;
-
-                if block_comment_start_count == symbols::keywords::BLOCK_COMMENT_CHAR_COUNT
-                {
-                    // This and the preceding open chars weren't normal characters, so remove them from the output
-                    end -= symbols::keywords::BLOCK_COMMENT_CHAR_COUNT;
-
-                    // This was the last start char needed to open a new block
-                    block_comment_open_count += 1;
-                    block_comment_start_count = 0;
-
-                    if block_comment_open_count == 1
-                    {
-                        // This is the first open, so...
-
-                        if start < end && !inside_line_comment
-                        {
-                            // Push any non-commented text if needed
-                            // note: skip the other preceding open chars
-                            start -= symbols::keywords::BLOCK_COMMENT_CHAR_COUNT - 1;
-                            segments.push(&source[start..end]);
-
-                            start = i + 1;
-                            end = 0;
-                        }
-                    }
-                }
-            }
-            // >
-            symbols::keywords::BLOCK_COMMENT_END_CHAR =>
-            {
-                block_comment_end_count += 1;
-                block_comment_start_count = 0;
-
-                // This is potentially just a normal character, so it might end up in the output
-                end = i + 1;
-
-                if block_comment_end_count == symbols::keywords::BLOCK_COMMENT_CHAR_COUNT
-                {
-                    // This and the preceding open chars weren't normal characters, so remove them from the output
-                    end -= symbols::keywords::BLOCK_COMMENT_CHAR_COUNT;
-
-                    // This was the last end char needed to close a block
-
-                    // Make sure there is a block to close
-                    if block_comment_open_count > 0
-                    {
-                        block_comment_open_count -= 1;
-                        block_comment_end_count = 0;
-
-                        if block_comment_open_count == 0
-                        {
-                            // This closes the first open
-                            start = i + 1;
-                            end = 0;
-                        }
-                    }
-                    else
-                    {
-                        panic!("Parse error: invalid block-comment closer!");
-                    }
-                }
-            }
-            c =>
-            {
-                // Not a block comment start or end character
-                block_comment_start_count = 0;
-                block_comment_end_count = 0;
-
-                match c
-                {
-                    symbols::keywords::LINE_COMMENT_CHAR if !inside_line_comment =>
-                    {
-                        // We've started a new line comment
-                        inside_line_comment = true;
-
-                        // If non-comment text has been found and we aren't also in a block comment...
-                        if start < end && block_comment_open_count == 0
-                        {
-                            segments.push(&source[start..end]);
-
-                            // Reset the next segment
-                            start = i + 1;
-                            end = 0;
-                        }
-                    }
-                    '\n' if inside_line_comment =>
-                    {
-                        // We're ending a line comment
-                        inside_line_comment = false;
-
-                        // The next segment starts after the newline
-                        start = i + 1;
-                        end = start;
-                    }
-                    '\r' if !inside_line_comment =>
-                    {
-                        // Skip over carriage returns in non-commented text
-                        if start < end && block_comment_open_count == 0
-                        {
-                            segments.push(&source[start..end]);
-
-                            // Reset the next segment
-                            start = i + 1;
-                            end = 0;
-                        }
-                        else
-                        {
-                            start = i + 1;
-                        }
-                    }
-                    _ =>
-                    {
-                        if inside_line_comment || block_comment_open_count > 0
-                        {
-                            // Skip characters from commented text
-                            start = i + 1;
-                            end = 0;
-                        }
-                        else
-                        {
-                            // Extend the current segment with non-commented text
-                            end = i + 1;
-                        }
-                    }
-                }
-            }
+            ParseNode::PartialList(_, children, _) => children.iter().collect(),
+            _ => Vec::new(),
         }
     }
-
-    if start < end && !inside_line_comment && block_comment_open_count == 0
+    fn get_children_mut(&mut self) -> Vec<&mut ParseNode>
     {
-        // There are characters left that have not been pushed into a segment
-        if start == 0
+        match self
         {
-            // There is only one segment, so just re-use the original string
-            return String::from(&source[0..end]);
+            ParseNode::PartialList(_, children, _) => children.iter_mut().collect(),
+            _ => Vec::new(),
         }
-        else
-        {
-            // Add the final segment
-            segments.push(&source[start..end]);
-        }
-    }
-
-    // Join all segments into the output String
-    let mut result = String::new();
-    for segment in segments
-    {
-        result.push_str(segment);
-        result.push('\n');
-    }
-    return result;
-}
-
-fn expand_node(node: &mut ParseNode)
-{
-    // Helper functions
-    fn is_pair(open: char, close: char) -> bool
-    {
-        match (open, close)
-        {
-            ('(', ')') => true,
-            ('[', ']') => true,
-            ('{', '}') => true,
-            _ => false,
-        }
-    }
-    fn push_symbol<'a>(
-        source: &'a str,
-        start: usize,
-        length: usize,
-        result: &mut Vec<ParseNode<'a>>,
-    )
-    {
-        let range: &str = &source[start..start + length];
-        result.push(ParseNode::Symbol(range));
-    }
-    fn push_unparsed<'a>(
-        bracket: BracketType,
-        source: &'a str,
-        start: usize,
-        length: usize,
-        result: &mut Vec<ParseNode<'a>>,
-    )
-    {
-        let range: &str = &source[start..start + length];
-        result.push(ParseNode::Unparsed(bracket, range));
-    }
-
-    // Expand an unparsed node
-    if let ParseNode::Unparsed(source_bracket, source) = node
-    {
-        // Index and length of the next node's source
-        let mut start = 0;
-        let mut length = 0;
-
-        // Information about the current enclosing bracket
-        let mut open_char = ' ';
-        let mut open_count = 0;
-
-        // Accumulate new parse nodes
-        let mut result: Vec<ParseNode> = Vec::new();
-
-        // Go through the source string character by character
-        for (i, c) in source.chars().enumerate()
-        {
-            match c
-            {
-                ' ' | '\t' | '\n' | '\r' =>
-                {
-                    // Any whitespace character
-                    if open_count > 0
-                    {
-                        // We're inside a list, so...
-                        if length > 0
-                        {
-                            // Add to the length if non-whitespace characters have already been found
-                            length += 1;
-                        }
-                        else
-                        {
-                            // Wait to start the list otherwise
-                            start = i + 1;
-                        }
-                    }
-                    else
-                    {
-                        // We're not inside a list
-                        if length > 0
-                        {
-                            // This whitespace is the end of some symbol
-                            push_symbol(source, start, length, &mut result);
-
-                            start = i + 1;
-                            length = 0;
-                        }
-                        else
-                        {
-                            // We're not inside a symbol (just in a sequence of whitespace)
-                            start = i + 1;
-                        }
-                    }
-                }
-
-                '(' | '[' | '{' =>
-                {
-                    // Any opening bracket
-
-                    if open_count > 0
-                    {
-                        // We're already inside a list, so...
-
-                        // Extend the list to include this character
-                        length += 1;
-
-                        // Make sure this open is closed before the current list is closed
-                        // (if the bracket type is the same)
-                        if open_char == c
-                        {
-                            open_count += 1;
-                        }
-                    }
-                    else
-                    {
-                        // We're not inside a list, so...
-
-                        if length > 0
-                        {
-                            // This open is the end of some symbol
-                            push_symbol(source, start, length, &mut result);
-                        }
-
-                        // This is now the opening bracket of the current list
-                        open_char = c;
-                        open_count = 1;
-
-                        start = i + 1;
-                        length = 0;
-                    }
-                }
-
-                ')' | ']' | '}' =>
-                {
-                    // Any closing bracket
-
-                    if open_count > 0 && is_pair(open_char, c)
-                    {
-                        // We're inside a list, and this is the same bracket type
-                        open_count -= 1;
-
-                        if open_count == 0
-                        {
-                            // This ends the current list
-                            let bracket = match open_char
-                            {
-                                '(' => BracketType::Round,
-                                '[' => BracketType::Square,
-                                '{' => BracketType::Curly,
-                                _ => BracketType::None,
-                            };
-
-                            // Create an unparsed child node
-                            push_unparsed(bracket, source, start, length, &mut result);
-
-                            start = i + 1;
-                            length = 0;
-                        }
-                        else
-                        {
-                            // This is just a part of the current list
-                            length += 1;
-                        }
-                    }
-                    else
-                    {
-                        // We aren't inside a any list
-                        // note: this is bad syntax
-                        length += 1;
-                    }
-                }
-
-                _ =>
-                {
-                    // Any other character
-                    // note: not whitespace or bracket
-
-                    // The current symbol or list is just extended
-                    length += 1;
-                }
-            }
-        }
-
-        // All characters have been read
-
-        if open_count > 0
-        {
-            // We ended inside an unclosed list
-            // TODO: emit warning
-
-            panic!("Unclosed list starting with `{}` @ `{}`", open_char, source);
-        }
-
-        if length > 0
-        {
-            // We ended inside a symbol before it could be ended by a whitespace character
-            push_symbol(source, start, length, &mut result);
-        }
-
-        // Mark the node as expanded
-        *node = ParseNode::List(*source_bracket, result);
     }
 }
 
-fn make_s_expression(node: ParseNode) -> Option<SExpression>
+///
+/// Parse transformation requires no state
+/// 
+struct ParseState {}
+
+///
+/// Recursive parse transformation
+/// 
+struct ParseTransform {}
+
+impl ParseTransform
 {
-    match node
+    pub fn new() -> ParseTransform
     {
-        ParseNode::List(bracket, elements) =>
+        ParseTransform {}
+    }
+}
+
+impl RecurTransform<ParseNode, ParseState, Error> for ParseTransform
+{
+    fn get_root_state(&mut self, _root: &ParseNode) -> ParseState
+    {
+        ParseState {}
+    }
+
+    fn enter(&mut self, node: &mut ParseNode, _state: &mut ParseState) -> ResultLog<(), Error>
+    {
+        match node
         {
-            let mut new_elements: Vec<SExpression> = Vec::new();
-            for element in elements
+            ParseNode::Unparsed(bracket, source) =>
             {
-                // Convert each child element into an S-Expression if possible
-                if let Some(new_element) = make_s_expression(element)
+                // Take unparsed nodes and try to create a partial list
+
+                match scan_text(source)
                 {
-                    new_elements.push(new_element);
+                    ResultLog::Ok(children) =>
+                    {
+                        let new_node = ParseNode::PartialList(*bracket, children, source.clone());
+                        *node = new_node;
+
+                        ResultLog::Ok(())
+                    }
+                    ResultLog::Warn(children, warnings) =>
+                    {
+                        let new_node = ParseNode::PartialList(*bracket, children, source.clone());
+                        *node = new_node;
+
+                        ResultLog::Warn((), warnings)
+                    }
+                    ResultLog::Error(errors, warnings) => ResultLog::Error(errors, warnings),
                 }
             }
 
-            return Some(SExpression::List(bracket, new_elements));
+            _ =>
+            {
+                // All other nodes can just be left as-is
+
+                ResultLog::Ok(())
+            }
         }
-        ParseNode::Symbol(symbol_str) =>
+    }
+    fn exit(&mut self, node: &mut ParseNode, _state: &mut ParseState) -> ResultLog<(), Error>
+    {
+        match node
         {
-            return Some(SExpression::Symbol(String::from(symbol_str)));
+            ParseNode::Unparsed(..) =>
+            {
+                // All nodes should have been expanded into something at this point
+
+                ResultLog::new_error(Error::Internal(format!(
+                    "Failed to expand parse node: {:?}",
+                    node
+                )))
+            }
+            ParseNode::PartialList(bracket, children, source) =>
+            {
+                // Take a partial list and turn it into an SExpression list
+
+                let original_children = std::mem::take(children);
+
+                let mut new_children = Vec::new();
+                let mut errors = Vec::new();
+
+                for child in original_children
+                {
+                    match child
+                    {
+                        ParseNode::Parsed(s_expression) =>
+                        {
+                            // Keep fully parsed child nodes
+
+                            new_children.push(s_expression);
+                        }
+                        ParseNode::Comment(..) =>
+                        {
+                            // Discard child comment nodes
+                        }
+                        child =>
+                        {
+                            let error = Error::Internal(format!(
+                                "Failed to expand child parse node: {:?}",
+                                child
+                            ));
+                            errors.push(error);
+                        }
+                    }
+                }
+
+                let mut new_source = source.clone();
+                new_source.extend(1);
+
+                *node = ParseNode::Parsed(SExpression::List(*bracket, new_children, new_source));
+
+                ResultLog::maybe_error((), Vec::new(), errors)
+            }
+            _ =>
+            {
+                // Leave all other nodes as-is
+
+                ResultLog::Ok(())
+            }
         }
-        ParseNode::Unparsed(_, _) =>
+    }
+}
+
+// Read one level of ParseNodes from a source block
+fn scan_text(source: &Source) -> ResultLog<Vec<ParseNode>, Error>
+{
+    enum Group
+    {
+        List(char, usize, usize, usize, usize),
+        Symbol(usize, usize, usize),
+        LineComment(usize, usize, usize),
+    }
+
+    let mut result = Vec::new();
+    let mut errors = Vec::new();
+    let mut warnings = Vec::new();
+    let mut line = 0;
+
+    let mut group_stack = Vec::new();
+
+    let text = source.get_text();
+
+    for (i, c) in text.chars().enumerate()
+    {
+        // Check if the current characters ends the current group
+
+        let mut end_current_group = false;
+        let mut inside_line_comment = false;
+
+        if c == '\n'
         {
-            // Some node has been left unparsed
-            // note: this shouldn't happen?
-            return None;
+            line += 1;
         }
+
+        match group_stack.last_mut()
+        {
+            None => (),
+            Some(Group::List(open, open_count, _first, last, _start_line)) =>
+            {
+                // We're checking for open/close characters to end this list
+
+                if c == *open
+                {
+                    *open_count += 1;
+                }
+                else if is_bracket_pair(*open, c)
+                {
+                    *open_count -= 1;
+
+                    if *open_count == 0
+                    {
+                        // The current list ends at this character
+
+                        *last = i;
+                        end_current_group = true;
+                    }
+                }
+            }
+            Some(Group::Symbol(_first, last, _start_line)) =>
+            {
+                // We're checking for whitespace, list delimiters, or comment delimiters to end this symbol
+
+                if !is_symbol_char(c)
+                {
+                    // The current symbol ends at the symbol before this one
+
+                    *last = i - 1;
+                    end_current_group = true;
+                }
+            }
+            Some(Group::LineComment(_first, last, _start_line)) =>
+            {
+                // We're checking for a line ending to end this comment
+
+                inside_line_comment = true;
+
+                if is_line_comment_end(c)
+                {
+                    // The current line comment ends at the symbol before this one
+
+                    *last = i - 1;
+                    end_current_group = true;
+                }
+            }
+        }
+
+        // By default, only check for group starts if we have no groups
+        let mut check_starts_group = group_stack.is_empty();
+
+        if end_current_group
+        {
+            match group_stack.pop().expect("Unexpected some group")
+            {
+                Group::List(open, _, first, last, start_line) =>
+                {
+                    let bracket = match open
+                    {
+                        '(' => BracketType::Round,
+                        '{' => BracketType::Curly,
+                        '[' => BracketType::Square,
+                        _ => BracketType::None,
+                    };
+
+                    let new_source = source.get_range(start_line, line, first + 1, last);
+                    let new_node = ParseNode::Unparsed(bracket, new_source);
+                    result.push(new_node);
+
+                    // The end of a list is part of that list
+                    check_starts_group = false;
+                }
+                Group::Symbol(first, last, start_line) =>
+                {
+                    let symbol = text[first..last + 1].to_owned();
+
+                    let new_source = source.get_range(start_line, line, first, last + 1);
+                    let new_node = ParseNode::Parsed(SExpression::Symbol(symbol, new_source));
+                    result.push(new_node);
+
+                    // A character that ends a symbol could start a list, comment, etc.
+                    check_starts_group = true;
+                }
+                Group::LineComment(first, last, start_line) =>
+                {
+                    let new_source = source.get_range(start_line, line, first, last);
+                    let new_node = ParseNode::Comment(new_source);
+                    result.push(new_node);
+
+                    // The end of a comment is part of that comment
+                    check_starts_group = false;
+                }
+            }
+        }
+
+        if check_starts_group
+        {
+            if is_bracket_open(c)
+            {
+                // Start a list group if we hit an open character
+
+                let new_group = Group::List(c, 1, i, i, line);
+                group_stack.push(new_group);
+            }
+            else if is_symbol_char(c) && group_stack.is_empty()
+            {
+                // Start a symbol group if we don't already have something
+
+                let new_group = Group::Symbol(i, i, line);
+                group_stack.push(new_group);
+            }
+        }
+
+        // Always check for line comments starting (if we aren't already in one)
+
+        if !inside_line_comment && is_line_comment_start(c)
+        {
+            let new_group = Group::LineComment(i, i, line);
+            group_stack.push(new_group);
+        }
+    }
+
+    // Check remaining groups for symbols or unclosed lists
+
+    for group in group_stack
+    {
+        match group
+        {
+            Group::List(open, _, first, _, start_line) =>
+            {
+                let mut open_string = String::new();
+                open_string.push(open);
+
+                let new_source = source.get_range(start_line, line, first, text.len());
+                let error = Error::UnclosedBracket(open_string, new_source);
+
+                errors.push(error);
+            }
+
+            Group::Symbol(first, _, start_line) =>
+            {
+                let end = text.len();
+                let symbol = text[first..end].to_owned();
+
+                let new_source = source.get_range(start_line, line, first, end);
+                let new_node = ParseNode::Parsed(SExpression::Symbol(symbol, new_source));
+                result.push(new_node);
+            }
+
+            Group::LineComment(..) =>
+            {
+                // Don't do anything with line comments
+            }
+        }
+    }
+
+    ResultLog::maybe_error(result, errors, warnings)
+}
+
+// Text scanning helper functions
+
+fn is_bracket_pair(open: char, close: char) -> bool
+{
+    match (open, close)
+    {
+        ('(', ')') => true,
+        ('[', ']') => true,
+        ('{', '}') => true,
+        _ => false,
+    }
+}
+
+fn is_whitespace(c: char) -> bool
+{
+    match c
+    {
+        ' ' | '\n' | '\t' | '\r' => true,
+        _ => false,
+    }
+}
+
+fn is_bracket_open(c: char) -> bool
+{
+    match c
+    {
+        '(' | '[' | '{' => true,
+        _ => false,
+    }
+}
+
+fn is_bracket_close(c: char) -> bool
+{
+    match c
+    {
+        ')' | ']' | '}' => true,
+        _ => false,
+    }
+}
+
+fn is_line_comment_start(c: char) -> bool
+{
+    match c
+    {
+        symbols::keywords::LINE_COMMENT_CHAR => true,
+        _ => false,
+    }
+}
+
+fn is_line_comment_end(c: char) -> bool
+{
+    match c
+    {
+        '\n' => true,
+        _ => false,
+    }
+}
+
+fn is_symbol_char(c: char) -> bool
+{
+    if is_whitespace(c) || is_bracket_close(c) || is_bracket_open(c) || is_line_comment_start(c)
+    {
+        false
+    }
+    else
+    {
+        true
     }
 }

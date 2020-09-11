@@ -4,17 +4,14 @@ pub mod primitive;
 pub mod reference;
 pub mod traits;
 
-pub mod all
-{
-    pub use super::*;
-    pub use class::*;
-    pub use function::*;
-    pub use primitive::*;
-    pub use reference::*;
-    pub use traits::*;
-}
+pub use class::*;
+pub use function::*;
+pub use primitive::*;
+pub use reference::*;
+pub use traits::*;
 
-use crate::language::ReferenceMode;
+pub use crate::language::ReferenceMode;
+
 use crate::utilities::Indirect;
 
 /* -------------------------------------------------------------------------- */
@@ -27,9 +24,11 @@ pub enum Type
     Unknown,
     Void,
 
-    Reference(reference::ReferenceType),
+    Integer,
+    Boolean,
+    Float,
 
-    Primitive(primitive::PrimitiveType),
+    Reference(reference::ReferenceType),
     Instance(class::InstanceType),
     Function(function::FunctionType),
     Class(class::ClassType),
@@ -61,7 +60,7 @@ impl Type
     {
         match self
         {
-            Type::Primitive(_) => true,
+            Type::Integer | Type::Boolean | Type::Float => true,
             Type::Instance(_) => true,
             _ => false,
         }
@@ -112,9 +111,12 @@ impl Type
         {
             Type::Unknown | Type::Void => traits::common::indirect::empty(),
 
+            Type::Integer => traits::common::indirect::integer(),
+            Type::Boolean => traits::common::indirect::boolean(),
+            Type::Float => traits::common::indirect::float(),
+
             Type::Reference(reference) => reference.get_traits(),
 
-            Type::Primitive(primitive) => primitive.get_traits(),
             Type::Instance(instance) => instance.get_traits(),
 
             Type::Function(function) => function.get_traits(),
@@ -138,13 +140,6 @@ impl ToType for reference::ReferenceType
     fn to_type(self) -> Type
     {
         return Type::Reference(self);
-    }
-}
-impl ToType for primitive::PrimitiveType
-{
-    fn to_type(self) -> Type
-    {
-        return Type::Primitive(self);
     }
 }
 impl ToType for class::InstanceType
@@ -179,23 +174,23 @@ pub mod basic_types
 
     pub fn unknown() -> Type
     {
-        return Type::Unknown;
+        Type::Unknown
     }
     pub fn void() -> Type
     {
-        return Type::Void;
+        Type::Void
     }
     pub fn integer() -> Type
     {
-        return Type::Primitive(primitive::PrimitiveType::Integer);
+        Type::Integer
     }
     pub fn boolean() -> Type
     {
-        return Type::Primitive(primitive::PrimitiveType::Boolean);
+        Type::Boolean
     }
     pub fn float() -> Type
     {
-        return Type::Primitive(primitive::PrimitiveType::Float);
+        Type::Float
     }
     pub mod indirect
     {
@@ -203,9 +198,9 @@ pub mod basic_types
         thread_local! {
             static UNKNOWN: Indirect<Type> = Indirect::new(Type::Unknown);
             static VOID: Indirect<Type>    = Indirect::new(Type::Void);
-            static INTEGER: Indirect<Type> = Indirect::new(Type::Primitive(primitive::PrimitiveType::Integer));
-            static BOOLEAN: Indirect<Type> = Indirect::new(Type::Primitive(primitive::PrimitiveType::Boolean));
-            static FLOAT: Indirect<Type>   = Indirect::new(Type::Primitive(primitive::PrimitiveType::Float));
+            static INTEGER: Indirect<Type> = Indirect::new(Type::Integer);
+            static BOOLEAN: Indirect<Type> = Indirect::new(Type::Boolean);
+            static FLOAT: Indirect<Type>   = Indirect::new(Type::Float);
         }
         pub fn unknown() -> Indirect<Type>
         {
@@ -231,6 +226,38 @@ pub mod basic_types
 }
 
 /* -------------------------------------------------------------------------- */
+/*                                 Comparison                                 */
+/* -------------------------------------------------------------------------- */
+
+impl PartialEq for Type
+{
+    fn eq(&self, other: &Type) -> bool
+    {
+        match (self, other)
+        {
+            (Type::Unknown, Type::Unknown) => true,
+            (Type::Void, Type::Void) => true,
+            
+            (Type::Integer, Type::Integer) => true,
+            (Type::Boolean, Type::Boolean) => true,
+            (Type::Float, Type::Float) => true,
+
+            (Type::Reference(ref_self), Type::Reference(ref_other)) => ref_self == ref_other,
+            (Type::Instance(instance_self), Type::Instance(instance_other)) =>
+            {
+                instance_self == instance_other
+            }
+            (Type::Function(function_self), Type::Function(function_other)) =>
+            {
+                function_self == function_other
+            }
+            (Type::Class(class_self), Type::Class(class_other)) => class_self == class_other,
+            _ => false,
+        }
+    }
+}
+
+/* -------------------------------------------------------------------------- */
 /*                                   Display                                  */
 /* -------------------------------------------------------------------------- */
 
@@ -243,9 +270,11 @@ impl std::fmt::Display for Type
             Type::Unknown => write!(f, "unknown"),
             Type::Void => write!(f, "void"),
 
-            Type::Reference(reference) => write!(f, "{}", reference),
+            Type::Integer => write!(f, "int"),
+            Type::Boolean => write!(f, "bool"),
+            Type::Float => write!(f, "float"),
 
-            Type::Primitive(primitive) => write!(f, "{}", primitive),
+            Type::Reference(reference) => write!(f, "{}", reference),
             Type::Instance(instance) => write!(f, "{}", instance),
 
             Type::Function(function) => write!(f, "{}", function),

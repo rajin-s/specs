@@ -30,6 +30,23 @@ impl ReferenceType
     }
 }
 
+impl PartialEq for ReferenceType
+{
+    fn eq(&self, other: &Self) -> bool
+    {
+        match self.mode == other.mode
+        {
+            true => (),
+            false => return false,
+        }
+
+        let self_target = self.target.borrow();
+        let other_target = other.target.borrow();
+
+        &*self_target == &*other_target
+    }
+}
+
 impl std::fmt::Display for ReferenceType
 {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result

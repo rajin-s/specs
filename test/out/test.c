@@ -1,9 +1,3 @@
 #include "specs_runtime.h"
 
-/* Program Body */
-int _specs__UserMain()
-{
-	int* x = 100;
-	int* y = x;
-	bool* z = true;
-}
+ int Foo(int x){ return (x + 1); } int FactSum__Helper(int x, int acc){ if (x == 0) { return acc; } else { return FactSum__Helper(x - 1, acc + x); } } int FactSum(int x){ /* fn FactSum/Helper */ return FactSum__Helper(x, 0); } int FactMul__Helper(int x, int acc){ if (x != 0) { return FactMul__Helper(x - 1, acc * x); } else { return acc; } } int FactMul(int x){ /* fn FactMul/Helper */ return FactMul__Helper(x, 1); } int __SpecsMain__(){ /* fn Foo */ int x = Foo(10); int y = Foo(x); /* fn FactSum */ /* fn FactMul */ int n_1 = FactSum(4); int m_2 = FactMul(n_1);  int _xbind_2; { n_1 = n_1 + 1;   int _xbind_1; { m_2 = m_2 + 1; _xbind_1 = m_2 + 1; } int _xop_1 = _xbind_1;  m_2 = _xop_1;  _xbind_2 = n_1 + m_2; } int p = _xbind_2;  p = p + 1; if (((p > 12) && (p < 32)) && ((p / 2) == 7)) { int q = - p; q = q * 2; q; } else { if ((p < 0) ^ (p < 123)) { p; } else { 0; }; } if (Foo(10) > 10) { return Foo(11); } else { return Foo(9); } } 

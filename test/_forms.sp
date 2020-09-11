@@ -16,23 +16,52 @@
     <<< Operators >>>
 
     (E ~ E)     # Infix Binary Operator
-                #   + - * / ^
-                #   and or xor
-                #   @
+        (E + E)
+        (E - E)
+        (E * E)
+        (E / E)
+        (E ^ E)
+        (E and E)
+        (E or  E)
+        (E xor E)
+        (E ==  E)
+        (E =/= E)
+        (E <  E)
+        (E >  E)
+        (E <= E)
+        (E >= E)
+    
+    (~ E E)     # Prefix Binary Operator
+        (+   E E)
+        (-   E E)
+        (*   E E)
+        (/   E E)
+        (^   E E)
+        (and E E)
+        (or  E E)
+        (xor E E)
+        (==  E E)
+        (=/= E E)
+        (< E E)
+        (> E E)
+        (<= E E)
+        (>= E E)
 
     (~ E)       # Prefix Unary Operator
-                #   -
-                #   not
-                #   create
+        (not E)
+        (-   E)
 
     <<< Operator-Like >>>
 
-    (E = E)     # Assignment
-    (E . s)     # Access
+    (E = E)         # Assign
+    (E . s)         # Access
 
-    (ref E)     # Reference
-                #   ref mut-ref
-    (deref E)   # Dereference
+    (R E)           # Reference/Dereference
+        (ref     E)
+        (mut-ref E)
+        (deref   E)
+
+    (create T)      # Create
 
     <<< Function Application >>>
 

@@ -1,59 +1,90 @@
-mod internal;
+use crate::language::node::*;
+use crate::utilities::*;
+
+use crate::errors::compile_error::*;
+
+mod common;
+
+// Passes
+
 mod type_system;
 
-use crate::language::node::*;
+mod flatten_bindings;
+mod flatten_definitions;
+mod flatten_names;
+mod flatten_operands;
 
-pub fn compile(root_node: Node) -> Option<Node>
+mod explicate_main;
+mod explicate_returns;
+
+mod c_convert;
+mod c_convert_names;
+
+///
+/// A compiler instance with associated configuration, etc.
+///
+pub struct Compiler {}
+
+impl Compiler
 {
-    use internal::*;
-    let mut root_ref = OtherNode::new(root_node);
+    pub fn new() -> Compiler
+    {
+        Compiler {}
+    }
 
-    macro_rules! passes {
-        { $root:ident => $( $pass:expr, )* } => {
-            $(
-                {
-                    let pass = $pass;
-                    println!("Pass: {}", pass.get_name());
+    pub fn compile_c(&self, mut node: Node) -> ResultLog<CNode, Error>
+    {
+        let mut errors = Vec::new();
+        let mut warnings = Vec::new();
 
-                    match apply_compiler_pass(pass, &mut $root)
+        macro_rules! passes
+        {
+            {
+                $($name:expr => $pass:expr,)+
+            } =>
+            {
+                $(
+                    match $pass.apply(&mut node)
                     {
-                        PassResult::Ok(warnings) =>
+                        ResultLog::Ok(()) => (),
+                        ResultLog::Warn((), mut new_warnings) => warnings.append(&mut new_warnings),
+                        ResultLog::Error(mut new_errors, mut new_warnings) =>
                         {
-                            println!("finished => {}", &$root);
-                            println!("");
-                            if !warnings.is_empty()
-                            {
-                                for warning in warnings
-                                {
-                                    println!("{}", warning);
-                                }
-                            }
-                            println!("");
-                        }
-                        PassResult::Err(errors) =>
-                        {
-                            println!("FAIL");
-                            println!("");
-            
-                            for error in errors
-                            {
-                                println!("{}", error);
-                            }
-                            
-                            return None;
+                            errors.append(&mut new_errors);
+                            warnings.append(&mut new_warnings);
+                            return ResultLog::Error(errors, warnings);
                         }
                     }
-                }
-            )*
-        };
-    }
 
-    passes! {
-        root_ref =>
-            type_system::build_definition_types::Pass::new(),
-            type_system::infer::Pass::new(),
-            type_system::print_types::Pass::new(),
-    }
+                    println!("# Pass {}\n\t{}\n", $name, node);
+                )+
+            };
+        }
 
-    return Some(root_ref.unwrap());
+        passes! {
+            "InferTypes"         => type_system::Infer::new(),
+            "CheckTypes"         => type_system::Check::new(),
+
+            "FlattenNames"       => flatten_names::FlattenNames::new(),
+            "FlattenDefinitions" => flatten_definitions::FlattenDefinitions::new(),
+            "FlattenOperands"    => flatten_operands::FlattenOperands::new(),
+            "FlattenBindings"    => flatten_bindings::FlattenBindings::new(),
+
+            "ExplicateMain"      => explicate_main::ExplicateMain::new("__SpecsMain__"),
+            "ExplicateReturns"   => explicate_returns::ExplicateReturns::new(),
+
+            "CConvertNames"      => c_convert_names::ConvertNames::new(),
+            "CConvert"           => c_convert::Convert::new(),
+        }
+
+        match node
+        {
+            Node::CNode(cnode) => ResultLog::maybe_warn(cnode, warnings),
+            _ =>
+            {
+                errors.push(Error::Internal(format!("Failed to get root CNode")));
+                ResultLog::Error(errors, warnings)
+            }
+        }
+    }
 }

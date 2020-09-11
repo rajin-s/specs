@@ -56,6 +56,7 @@ pub mod common
             static EMPTY: Indirect<TraitSet> = Indirect::new(TraitSet::empty());
             static INTEGER: Indirect<TraitSet> = Indirect::new(TraitSet::new(vec![]));
             static BOOLEAN: Indirect<TraitSet> = Indirect::new(TraitSet::new(vec![]));
+            static FLOAT: Indirect<TraitSet> = Indirect::new(TraitSet::new(vec![]));
         }
         pub fn empty() -> Indirect<TraitSet>
         {
@@ -68,6 +69,10 @@ pub mod common
         pub fn boolean() -> Indirect<TraitSet>
         {
             return BOOLEAN.with(|t| t.clone());
+        }
+        pub fn float() -> Indirect<TraitSet>
+        {
+            return FLOAT.with(|t| t.clone());
         }
     }
 }

@@ -1,23 +1,26 @@
-#![feature(const_vec_new, get_mut_unchecked)]
+#![feature(get_mut_unchecked)]
 #![allow(dead_code)]
 
 #[macro_use]
 mod macros;
 mod utilities;
 
+mod compiler;
+mod errors;
 mod language;
 mod parser;
-mod compiler;
+mod source;
 
-// use compiler::*;
-use language::node::*;
-use parser::*;
+use parser::Parser;
+use compiler::Compiler;
 use std::fs;
 
 fn main()
 {
+    use language::node::*;
+
     let mut args = std::env::args();
-    args.next();
+    args.next(); // Skip the first argument (executable name)
 
     let input_path = if let Some(path) = args.next()
     {
@@ -27,6 +30,7 @@ fn main()
     {
         String::from("main.sp")
     };
+
     let output_path = if let Some(path) = args.next()
     {
         path
@@ -36,72 +40,93 @@ fn main()
         input_path.replace(".sp", ".c")
     };
 
-    if let Ok(source) = fs::read_to_string(&input_path)
+    let source = match fs::read_to_string(&input_path)
     {
-        println!("Source Text:");
-        println!("\t{}\n", source.replace("\n", "\n\t"));
-
-        let parser = Parser::new();
-
-        if let Some(mut s_expression) = parser.parse_source(&source)
+        Ok(source) => source,
+        Err(error) =>
         {
-            println!("S-Expression Result:");
-            println!("\t{}\n", &s_expression);
+            eprintln!("Failed to open file '{}': {}", input_path, error);
+            return;
+        }
+    };
 
-            parser.preprocess(&mut s_expression);
-            println!("Preprocessor Result:");
-            println!("\t{}\n", &s_expression);
+    println!("Source Text:");
+    println!("\t{}\n", source.replace("\n", "\n\t"));
 
-            match parser.parse_expression(&s_expression)
+    let parser = Parser::new();
+
+    let mut s_expression = {
+        use errors::s_expression_error::*;
+        match parser.make_s_expression(source)
+        {
+            ResultLog::Ok(s_expression) => s_expression,
+            ResultLog::Warn(s_expression, warnings) =>
             {
-                ParseResult::Success(node, warnings) =>
-                {
-                    println!("Parse Succeeded");
-                    println!("Warnings:");
-                    for warning in warnings.iter()
-                    {
-                        println!("Parse warning: {}", warning);
-                    }
-                    
-                    println!("Parse Result:");
-                    println!("\t{}\n", &node);
-
-                    let _result = compiler::compile(node);
-
-                    // let mut options = CompilerOptions::new();
-                    // {
-                    //     options.show_debug_output = true;
-                    // }
-
-                    // let mut compiler = Compiler::new(options, node);
-                    // let compile_result = compiler.compile();
-
-                    // if let Some(c_string) = compile_result
-                    // {
-                    //     println!("C output:\n");
-                    //     println!("{}", c_string);
-                    //     let _ = fs::write(output_path, c_string);
-                    // }
-                }
-                ParseResult::Error(errors, warnings) =>
-                {
-                    println!("Parse Failed");
-                    println!("Warnings:");
-                    for warning in warnings.iter()
-                    {
-                        println!("Parse warning: {}", warning);
-                    }
-                    println!("Errors:");
-                    for error in errors.iter().rev()
-                    {
-                        println!("Parse error: {}", error);
-                    }
-                }
+                print_warnings(&warnings);
+                s_expression
+            }
+            ResultLog::Error(errors, warnings) =>
+            {
+                print_warnings(&warnings);
+                print_errors(&errors);
+                return;
             }
         }
-    }
-    else
-    {
-        println!("Failed to open file: '{}'", &input_path);
-    }
+    };
+
+    println!("S-Expression Result:");
+    println!("\t{}\n", &s_expression);
+
+    parser.preprocess(&mut s_expression);
+
+    println!("Preprocessor Result:");
+    println!("\t{}\n", &s_expression);
+
+    let node = {
+        use errors::parse_error::*;
+        match parser.make_node(s_expression)
+        {
+            ResultLog::Ok(node) => node,
+            ResultLog::Warn(node, warnings) =>
+            {
+                print_warnings(&warnings);
+                node
+            }
+            ResultLog::Error(errors, warnings) =>
+            {
+                print_warnings(&warnings);
+                print_errors(&errors);
+                return;
+            }
+        }
+    };
+
+    println!("Parse Result:");
+    println!("\t{}\n", &node);
+
+    let compiler = Compiler::new();
+
+    let cnode = {
+        use errors::compile_error::*;
+        match compiler.compile_c(node)
+        {
+            ResultLog::Ok(cnode) => cnode,
+            ResultLog::Warn(cnode, warnings) =>
+            {
+                print_warnings(&warnings);
+                cnode
+            }
+            ResultLog::Error(errors, warnings) =>
+            {
+                print_warnings(&warnings);
+                print_errors(&errors);
+                return;
+            }
+        }
+    };
+
+    let c = format!("#include \"specs_runtime.h\"\n\n{}", cnode);
+    println!("Compile Result:\n\n{}", c);
+
+    fs::write(output_path, c).expect("Failed to write output file");
 }
